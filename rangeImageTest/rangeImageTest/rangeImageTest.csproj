@@ -82,30 +82,36 @@
       <SpecificVersion>False</SpecificVersion>
       <HintPath>Extension\Emgu.CV.dll</HintPath>
     </Reference>
-    <Reference Include="Emgu.CV.DebuggerVisualizers.VS2013">
+    <Reference Include="Emgu.CV.DebuggerVisualizers.VS2013, Version=2.4.10.1939, Culture=neutral, PublicKeyToken=7281126722ab4438, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
       <HintPath>Extension\Emgu.CV.DebuggerVisualizers.VS2013.dll</HintPath>
     </Reference>
-    <Reference Include="Emgu.CV.GPU">
+    <Reference Include="Emgu.CV.GPU, Version=2.4.10.1939, Culture=neutral, PublicKeyToken=7281126722ab4438, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
       <HintPath>Extension\Emgu.CV.GPU.dll</HintPath>
     </Reference>
     <Reference Include="Emgu.CV.ML, Version=2.4.10.1939, Culture=neutral, PublicKeyToken=7281126722ab4438, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
       <HintPath>Extension\Emgu.CV.ML.dll</HintPath>
     </Reference>
-    <Reference Include="Emgu.CV.OCR">
+    <Reference Include="Emgu.CV.OCR, Version=2.4.10.1939, Culture=neutral, PublicKeyToken=7281126722ab4438, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
       <HintPath>Extension\Emgu.CV.OCR.dll</HintPath>
     </Reference>
-    <Reference Include="Emgu.CV.OpenCL">
+    <Reference Include="Emgu.CV.OpenCL, Version=2.4.10.1939, Culture=neutral, PublicKeyToken=7281126722ab4438, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
       <HintPath>Extension\Emgu.CV.OpenCL.dll</HintPath>
     </Reference>
-    <Reference Include="Emgu.CV.Stitching">
+    <Reference Include="Emgu.CV.Stitching, Version=2.4.10.1939, Culture=neutral, PublicKeyToken=7281126722ab4438, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
       <HintPath>Extension\Emgu.CV.Stitching.dll</HintPath>
     </Reference>
     <Reference Include="Emgu.CV.UI, Version=2.4.10.1939, Culture=neutral, PublicKeyToken=7281126722ab4438, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
       <HintPath>Extension\Emgu.CV.UI.dll</HintPath>
     </Reference>
-    <Reference Include="Emgu.CV.VideoStab">
+    <Reference Include="Emgu.CV.VideoStab, Version=2.4.10.1939, Culture=neutral, PublicKeyToken=7281126722ab4438, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
       <HintPath>Extension\Emgu.CV.VideoStab.dll</HintPath>
     </Reference>
     <Reference Include="Emgu.Util, Version=2.4.10.1939, Culture=neutral, PublicKeyToken=7281126722ab4438, processorArchitecture=MSIL">
@@ -189,6 +195,20 @@
     <Content Include="cvextern.dll">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
+    <Content Include="Extension\Emgu.CV.DebuggerVisualizers.VS2008.dll" />
+    <Content Include="Extension\Emgu.CV.DebuggerVisualizers.VS2010.dll" />
+    <Content Include="Extension\Emgu.CV.DebuggerVisualizers.VS2012.dll" />
+    <Content Include="Extension\Emgu.CV.DebuggerVisualizers.VS2013.dll" />
+    <Content Include="Extension\Emgu.CV.dll" />
+    <Content Include="Extension\Emgu.CV.GPU.dll" />
+    <Content Include="Extension\Emgu.CV.ML.dll" />
+    <Content Include="Extension\Emgu.CV.OCR.dll" />
+    <Content Include="Extension\Emgu.CV.OpenCL.dll" />
+    <Content Include="Extension\Emgu.CV.Stitching.dll" />
+    <Content Include="Extension\Emgu.CV.UI.dll" />
+    <Content Include="Extension\Emgu.CV.VideoStab.dll" />
+    <Content Include="Extension\Emgu.Util.dll" />
+    <Content Include="Extension\ZedGraph.dll" />
     <Content Include="OpenCL.dll">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
