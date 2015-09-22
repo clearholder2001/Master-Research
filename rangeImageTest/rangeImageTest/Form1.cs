@@ -117,8 +117,8 @@ namespace rangeImageTest
 				return;
 			
 			//計算range image的size
-			int width = (int)((maxBoundary[0] - minBoundary[0]) / gridSize) + 1;
-			int height = (int)((maxBoundary[1] - minBoundary[1]) / gridSize) + 1;
+			int width = (int)Math.Ceiling((maxBoundary[0] - minBoundary[0]) / gridSize);
+			int height = (int)Math.Ceiling((maxBoundary[1] - minBoundary[1]) / gridSize);
 			double xMin = minBoundary[0];
 			double yMin = minBoundary[1];
 			double zMin = minBoundary[2];
@@ -145,9 +145,9 @@ namespace rangeImageTest
 			int pcX, pcY, pcZ;
 			for (int i = 0; i < pcNum; i++)
 			{
-				pcX = (int)((pcArray[i, 0] - xMin) / gridSize);
-				pcY = (int)((pcArray[i, 1] - yMin) / gridSize);
-				pcZ = (int)((pcArray[i, 2] - zMin) / zRange * 254) + 1;
+				pcX = (int)Math.Round((pcArray[i, 0] - xMin) / gridSize);
+				pcY = (int)Math.Round((pcArray[i, 1] - yMin) / gridSize);
+				pcZ = (int)Math.Round((pcArray[i, 2] - zMin) / zRange * 254) + 1;
 				if (pcZ > rangeImgData[pcX, height - pcY - 1, 0])
 				{
 					rangeImgData[pcX, height - pcY - 1, 0] = (byte)pcZ;
@@ -162,6 +162,9 @@ namespace rangeImageTest
 			rangeImg = BitmapTool.Array2Bitmap(rangeImgData, PixelFormat.Format8bppIndexed);
 
 			Image<Gray, Byte> img = new Image<Gray, Byte>(rangeImg);
+
+			//做histogram equalization
+			//img._EqualizeHist();
 			imageBox1.Image = img;
 		}
 
