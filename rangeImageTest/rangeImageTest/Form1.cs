@@ -117,8 +117,8 @@ namespace rangeImageTest
 				return;
 			
 			//計算range image的size
-			int width = (int)Math.Ceiling((maxBoundary[0] - minBoundary[0]) / gridSize);
-			int height = (int)Math.Ceiling((maxBoundary[1] - minBoundary[1]) / gridSize);
+			int width = (int)Math.Ceiling((Math.Ceiling(maxBoundary[0]) - Math.Floor(minBoundary[0])) / gridSize);
+			int height = (int)Math.Ceiling((Math.Ceiling(maxBoundary[1]) - Math.Floor(minBoundary[1])) / gridSize);
 			double xMin = minBoundary[0];
 			double yMin = minBoundary[1];
 			double zMin = minBoundary[2];
