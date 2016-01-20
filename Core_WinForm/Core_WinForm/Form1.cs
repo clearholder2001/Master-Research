@@ -1,50 +1,34 @@
-﻿/*
-功能：
-1. 製作range image
-
-return值：
--1代表讀檔失敗
--2產生影像失敗
-+1代表成功
-
-*/
-
-using System;
-using System.IO;
-// using System.Collections.Generic;
+﻿using System;
+// using System.IO;
+using System.Collections.Generic;
 // using System.ComponentModel;
 // using System.Data;
 using System.Drawing;
-using System.Linq;
+// using System.Linq;
 // using System.Text;
 // using System.Diagnostics;
 using System.Windows.Forms;
 
-using OpenTK;
-using OpenTK.Graphics.OpenGL;
+using Core;
 
-using ImageTool;
-using Emgu.CV;
-using Emgu.CV.Structure;
 
-using MathWorks.MATLAB.NET.Arrays;
-using xyzMatlabTool;
+// using OpenTK;
+// using OpenTK.Graphics.OpenGL;
+
+// using ImageTool;
+// using Emgu.CV;
+// using Emgu.CV.Structure;
 
 
 namespace Core_WinForm
 {
 	public partial class Form1 : Form
 	{
-		//Global variable
-		//--------------------------
-		private string objFileName, xyzFileName;
-		private double[,,] obj2dData, xyz2dData;
+		//----Global variable-------
+		private xyzClass xyz;
+		private objClass obj;
 		private double gridSize;
-		private int featureDimention;
-		private Bitmap objRangeImg, xyzRangeImg;
-		private StructuringElementEx StructEle;
-		private int structEleSize, MorIterNum;
-		private Emgu.CV.CvEnum.CV_ELEMENT_SHAPE structEleShape;
+		private static readonly int annularNum = 20;
 		//--------------------------
 
 
@@ -53,18 +37,22 @@ namespace Core_WinForm
 			InitializeComponent();
 		}
 
-
+		/*
 		private struct PointCloud
 		{
 			public double x, y, z;
 		}
+		*/
 
 		private void Form1_Load(object sender, EventArgs e)
 		{
-			featureDimention = 4;
-			structEleSize = 5;
-			structEleShape = Emgu.CV.CvEnum.CV_ELEMENT_SHAPE.CV_SHAPE_RECT;
-			MorIterNum = 1;
+			toolStripLabel1.Text = "Grid size: " + ((double)hScrollBar1.Value / 100.0) + " meter";
+
+			for (int i = 0; i < coreClass.featureDimension; i++)
+			{
+				toolStripComboBox1.Items.Add(coreClass.featureDimensionName[i]);
+			}
+			toolStripComboBox1.SelectedIndex = 0;
 		}
 
 		//Custom function
@@ -119,33 +107,18 @@ namespace Core_WinForm
 			return dialogResult;
 		}
 
-		private Bitmap Data2Bitmap(double[,,] data, int featureIndex)
+		private void WriteConsole(string message)
 		{
-			if (featureIndex >= data.GetLength(2) || featureIndex < 0)
-				return null;
-
-			int width = data.GetLength(0);
-			int height = data.GetLength(1);
-
-			byte[,,] imgData = new byte[width, height, 1];
-
-			double zMax = Enumerable.Range(0, width * height).Select(i => data[i % width, i % height, featureIndex]).Max();
-			double zMin = Enumerable.Range(0, width * height).Select(i => data[i % width, i % height, featureIndex]).Min();
-			double zRange = zMax - zMin;
-
-			for (int i = 0; i < width; i++)
-			{
-				for (int j = 0; j < height; j++)
-				{
-					imgData[i, j, 0] = (byte)((data[i, j, featureIndex] - zMin) / zRange * 255);
-				}
-			}
-
-			Bitmap outputImg = BitmapTool.Array2Bitmap(imgData, System.Drawing.Imaging.PixelFormat.Format8bppIndexed);
-
-			return outputImg;
+			richTextBox1.Text += message + "\n";
 		}
 
+		private void WriteSeries(string message)
+		{
+			richTextBox2.Text += message;
+			richTextBox2.Text += "--------------------------------\n";
+		}
+
+		/*
 		private bool obj_do_work(double gridSize, string fileName, out Bitmap outputImg)
 		{
 
@@ -240,7 +213,7 @@ namespace Core_WinForm
 
 				//draw depth
 				pixels = new float[width * height];
-				obj2dData = new double[width, height, featureDimention];
+				obj2dData = new double[width, height, featureDimension];
 				GL.ReadPixels(0, 0, width, height, PixelFormat.DepthComponent, PixelType.Float, pixels);
 
 
@@ -266,9 +239,9 @@ namespace Core_WinForm
 					}
 				}
 
-				double zSum = Enumerable.Range(0, width * height).Select(i => obj2dData[i % width, i % height, 0]).Sum();
-				int xAvg = (int)Math.Round(Enumerable.Range(0, width * height).Select(i => obj2dData[i % width, i % height, 1]).Sum() / zSum);
-				int yAvg = (int)Math.Round(Enumerable.Range(0, width * height).Select(i => obj2dData[i % width, i % height, 2]).Sum() / zSum);
+				double zSum = Enumerable.Range(0, width * height).Select(i => obj2dData[i % width, i / width, 0]).Sum();
+				int xAvg = (int)Math.Round(Enumerable.Range(0, width * height).Select(i => obj2dData[i % width, i / width, 1]).Sum() / zSum);
+				int yAvg = (int)Math.Round(Enumerable.Range(0, width * height).Select(i => obj2dData[i % width, i / width, 2]).Sum() / zSum);
 
 				for (int i = xAvg - 1; i <= xAvg + 1; i++)
 				{
@@ -279,7 +252,7 @@ namespace Core_WinForm
 				}
 
 
-				outputImg = Data2Bitmap(obj2dData, 0);
+				outputImg = utilClass.Data2Bitmap(obj2dData, 0);
 
 
 				writeConsole("Model file: " + fileName);
@@ -296,7 +269,9 @@ namespace Core_WinForm
 				return true;
 			}
 		}
+		*/
 
+		/*
 		private bool xyz_do_work(double gridSize, string fileName, out Bitmap outputImg)
 		{
 			double[,] pcArray; //點雲陣列
@@ -382,7 +357,7 @@ namespace Core_WinForm
 
 
 			//xyz2dData初始化並填值
-			xyz2dData = new double[width, height, featureDimention];
+			xyz2dData = new double[width, height, featureDimension];
 			for (int i = 0; i < width; i++)
 			{
 				for (int j = 0; j < height; j++)
@@ -431,9 +406,9 @@ namespace Core_WinForm
 				}
 			}
 
-			double zSum = Enumerable.Range(0, width * height).Select(i => xyz2dData[i % width, i % height, 0]).Sum();
-			int xAvg = (int)Math.Round(Enumerable.Range(0, width * height).Select(i => xyz2dData[i % width, i % height, 1]).Sum() / zSum);
-			int yAvg = (int)Math.Round(Enumerable.Range(0, width * height).Select(i => xyz2dData[i % width, i % height, 2]).Sum() / zSum);
+			double zSum = Enumerable.Range(0, width * height).Select(i => xyz2dData[i % width, i / width, 0]).Sum();
+			int xAvg = (int)Math.Round(Enumerable.Range(0, width * height).Select(i => xyz2dData[i % width, i / width, 1]).Sum() / zSum);
+			int yAvg = (int)Math.Round(Enumerable.Range(0, width * height).Select(i => xyz2dData[i % width, i / width, 2]).Sum() / zSum);
 
 			for (int i = xAvg - 1; i <= xAvg + 1; i++)
 			{
@@ -460,10 +435,15 @@ namespace Core_WinForm
 
 
 
-			outputImg = Data2Bitmap(xyz2dData, 0);
+			outputImg = utilClass.Data2Bitmap(xyz2dData, 0);
 			return true;
 
-			/*
+
+
+
+			//以下無使用！
+
+
 			//計算在range image中在建築物範圍內的pixel數量
 			pcNum = 0;
 			foreach (PointCloud i in zMaxArray)
@@ -507,17 +487,9 @@ namespace Core_WinForm
 
 			return true;
 
-			*/
-
-
-
+			
 		}
-
-		private void writeConsole(string message)
-		{
-			richTextBox1.Text += message + "\n";
-		}
-
+		*/
 
 
 
@@ -526,6 +498,12 @@ namespace Core_WinForm
 		{
 			richTextBox1.SelectionStart = richTextBox1.TextLength;
 			richTextBox1.ScrollToCaret();
+		}
+
+		private void richTextBox2_TextChanged(object sender, EventArgs e)
+		{
+			richTextBox2.SelectionStart = richTextBox1.TextLength;
+			richTextBox2.ScrollToCaret();
 		}
 
 		private void pictureBox1_DoubleClick(object sender, EventArgs e)
@@ -560,6 +538,8 @@ namespace Core_WinForm
 					return;
 				}
 
+				obj = new objClass(ofd.FileName);
+
 				if (gridSize * 100 > 100)
 					hScrollBar1.Value = hScrollBar1.Maximum;
 				else if (gridSize * 100 < 0)
@@ -567,10 +547,13 @@ namespace Core_WinForm
 				else
 					hScrollBar1.Value = (int)(gridSize * 100);
 
-				if (obj_do_work(gridSize, ofd.FileName, out objRangeImg))
-					pictureBox1.Image = objRangeImg;
-
-				objFileName = ofd.FileName;
+				if (obj.GenerateRangeImage(gridSize) && obj.GenerateFeature(annularNum))
+				{
+					pictureBox1.Image = utilClass.Data2Bitmap(obj.data2D, toolStripComboBox1.SelectedIndex);
+					//pictureBox1.Image = obj.rangeImg;
+					WriteConsole(obj.OutputConsole());
+					WriteSeries(obj.OutputSeries());
+				}
 			}
 		}
 
@@ -586,6 +569,8 @@ namespace Core_WinForm
 					return;
 				}
 
+				xyz = new xyzClass(ofd.FileName);
+
 				if (gridSize * 100 > 100)
 					hScrollBar1.Value = hScrollBar1.Maximum;
 				else if (gridSize * 100 < 0)
@@ -593,16 +578,25 @@ namespace Core_WinForm
 				else
 					hScrollBar1.Value = (int)(gridSize * 100);
 
-				if (xyz_do_work(gridSize, ofd.FileName, out xyzRangeImg))
-					pictureBox2.Image = xyzRangeImg;
-
-				xyzFileName = ofd.FileName;
+				if (xyz.GenerateRangeImage(gridSize) && xyz.GenerateFeature(annularNum))
+				{
+					pictureBox2.Image = utilClass.Data2Bitmap(xyz.data2D, toolStripComboBox1.SelectedIndex);
+					//pictureBox2.Image = xyz.rangeImg;
+					WriteConsole(xyz.OutputConsole());
+					WriteSeries(xyz.OutputSeries());
+				}
 			}
 		}
 
-		private void regenerateRangeImageToolStripMenuItem_Click(object sender, EventArgs e)
+		private void hScrollBar1_ValueChanged(object sender, EventArgs e)
 		{
-			if (objFileName == null || xyzFileName == null)
+			toolStripLabel1.Text = "Grid size: " + ((double)hScrollBar1.Value / 100.0) + " meter";
+
+		}
+
+		private void toolStripButton1_Click(object sender, EventArgs e)
+		{
+			if (xyz == null && obj == null)
 			{
 				MessageBox.Show("Please load file first!");
 				return;
@@ -610,13 +604,19 @@ namespace Core_WinForm
 
 			gridSize = (double)hScrollBar1.Value / 100.0;
 
-			if (obj_do_work(gridSize, objFileName, out objRangeImg))
-				pictureBox1.Image = objRangeImg;
+			if (obj != null && obj.GenerateRangeImage(gridSize) && obj.GenerateFeature(annularNum))
+			{
+				pictureBox1.Image = utilClass.Data2Bitmap(obj.data2D, toolStripComboBox1.SelectedIndex); ;
+				WriteConsole(obj.OutputConsole());
+				WriteSeries(obj.OutputSeries());
+			}
 
-			if (xyz_do_work(gridSize, xyzFileName, out xyzRangeImg))
-				pictureBox2.Image = xyzRangeImg;
-
+			if (xyz != null && xyz.GenerateRangeImage(gridSize) && xyz.GenerateFeature(annularNum))
+			{
+				pictureBox2.Image = utilClass.Data2Bitmap(xyz.data2D, toolStripComboBox1.SelectedIndex);
+				WriteConsole(xyz.OutputConsole());
+				WriteSeries(xyz.OutputSeries());
+			}
 		}
-
 	}
 }
