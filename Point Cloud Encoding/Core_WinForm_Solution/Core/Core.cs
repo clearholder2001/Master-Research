@@ -43,18 +43,17 @@ using MathNet.Numerics.LinearAlgebra;
 namespace Core
 {
 	//Base class
-	class coreClass
+	public class coreClass
 	{
-		public string fileName { get; set; }
-		public double gridSize { get; set; }
-		public double eigenFeatureDiameter { get; set; }
-		public int annularNum { get; set; }
+		public string fileName { get; private set; }
+		public double eigenFeatureDiameter { get; private set; }
 
 		public double[,,] data2D { get; protected set; }
 		public bool[,] data2DMask { get; protected set; }
 		public byte[,] data2DAnnularIndex { get; protected set; }
 		public double[,] annularFeature { get; protected set; }
 		public Bitmap rangeImg { get; protected set; }
+		public Bitmap rangeThumbnailImg { get; protected set; }
 		public Bitmap featureImg { get; protected set; }
 		
 		public double xMax { get; protected set; }
@@ -78,19 +77,26 @@ namespace Core
 		public double radiusMax { get; protected set; }
 
 		//Options
-		public const int featureDimension = 5;
-		public static readonly string[] featureDimensionName = new string[featureDimension] { "Height", "Edge" , "Linearity", "Planarity", "Sphericity"}; //記得增修
-		public static readonly int annularfeatureDimension = featureDimension;
-		public const int eigenFeatureDiameterFactor = 3;
-		public const bool ifDisplayCenter = false;
+		public static double gridSize { get; set; }
+		public static int annularNum { get; set; }
+		public enum feature : byte { Height, Edge, Linearity, Planarity, Sphericity }
+		public static int featureDimension = Enum.GetValues(typeof(feature)).Length;
+		public static int eigenFeatureDiameterMultiple;
+		public static int thumbnailImgMaxSize;
+		public static bool ifDisplayCenter;
 
 
 		public coreClass(string fileName)
 		{
 			this.fileName = fileName;
+// 			gridSize = 0.1;
+// 			annularNum = 10;
+// 			eigenFeatureDiameterMultiple = 3;
+			thumbnailImgMaxSize = 100;
+			ifDisplayCenter = false;
 		}
 
-		public virtual bool GenerateRangeImage(double gridSize)
+		public virtual bool GenerateRangeImage()
 		{
 			return false;
 		}
@@ -100,7 +106,7 @@ namespace Core
 			string message = string.Empty;
 
 			if (Path.GetExtension(fileName) == ".obj")
-				message += "Type: model\n";
+				message += "Type: polygonal model\n";
 			else
 				message += "Type: point cloud\n";
 
@@ -116,9 +122,8 @@ namespace Core
 			message += "yCenter: " + (double)yAvg / (double)(height - 1) + "\n";
 			message += "zCenter: " + zAvg + "\n";
 			message += "radiusMax: " + radiusMax + " m\n";
-			message += "Total area: " + totalArea + " m2\n";
-			message += "Total volume: " + totalVol + " m3\n";
-			message += "-----End-----";
+			message += "totalArea: " + totalArea + " m2\n";
+			message += "totalVol: " + totalVol + " m3\n";
 
 			return message;
 		}
@@ -133,23 +138,21 @@ namespace Core
 			series += radiusMax + "\n";
 
 
-			for (int i = 0; i < annularfeatureDimension; i++)
+			for (int i = 0; i < featureDimension; i++)
 			{
 				for (int j = 0; j < annularNum; j++)
 				{
-					series += annularFeature[j, i] + "\n";	
+					series += annularFeature[i, j] + "\n";	
 				}
 			}
 
 			return series;
 		}
 
-		public bool GenerateFeature(int annularNum)
+		public bool GenerateFeature()
 		{
 			if (data2D == null)
 				return false;
-
-			this.annularNum = annularNum;
 
 			CalArea();
 			CalVol();
@@ -168,7 +171,7 @@ namespace Core
 
 		private void CalVol()
 		{
-			totalVol = Enumerable.Range(0, width * height).Where(i => data2DMask[i % width, i / width] == true).Select(i => data2D[i % width, i / width, 0]).Sum();
+			totalVol = Enumerable.Range(0, width * height).Where(i => data2DMask[i % width, i / width] == true).Select(i => data2D[i % width, i / width, (byte)feature.Height]).Sum();
 		}
 
 		private void Cal2DFeature()
@@ -180,7 +183,7 @@ namespace Core
 				{
 					for (int j = 0; j < height; j++)
 					{
-						emguImg.Data[j, i, 0] = (byte)data2D[i, j, 0];
+						emguImg.Data[j, i, 0] = (byte)data2D[i, j, (byte)feature.Height];
 					}
 				}
 
@@ -191,7 +194,7 @@ namespace Core
 				{
 					for (int j = 0; j < height; j++)
 					{
-						data2D[i, j, 1] = emguLoGImg.Data[j, i, 0];
+						data2D[i, j, 1] = Math.Abs(emguLoGImg.Data[j, i, (byte)feature.Height]);
 					}
 				}
 			}
@@ -199,7 +202,7 @@ namespace Core
 
 
 			//Eigen feature
-			eigenFeatureDiameter = gridSize * eigenFeatureDiameterFactor;
+			eigenFeatureDiameter = gridSize * eigenFeatureDiameterMultiple;
 			//List<double[]> neighborList = new List<double[]>();
 			//List<List<double[]>> tt = new List<List<double[]>>();
 			//List<Vector<Complex>> ttp = new List<Vector<Complex>>();
@@ -210,7 +213,7 @@ namespace Core
 				{
 					if (data2DMask[i, j])
 					{
-						if (i < eigenFeatureDiameterFactor || i > width - 1 - eigenFeatureDiameterFactor || j < eigenFeatureDiameterFactor || j > height - 1 - eigenFeatureDiameterFactor)
+						if (i < eigenFeatureDiameterMultiple || i > width - 1 - eigenFeatureDiameterMultiple || j < eigenFeatureDiameterMultiple || j > height - 1 - eigenFeatureDiameterMultiple)
 						{
 
 						}
@@ -218,14 +221,14 @@ namespace Core
 						{
 							List<double[]> neighborList = new List<double[]>();
 							//neighborList.Clear();
-							for (int k = i - eigenFeatureDiameterFactor; k <= i + eigenFeatureDiameterFactor; k++)
+							for (int k = i - eigenFeatureDiameterMultiple; k <= i + eigenFeatureDiameterMultiple; k++)
 							{
-								for (int l = j - eigenFeatureDiameterFactor; l <= j + eigenFeatureDiameterFactor; l++)
+								for (int l = j - eigenFeatureDiameterMultiple; l <= j + eigenFeatureDiameterMultiple; l++)
 								{
 
-									if (data2DMask[k, l] && Math.Sqrt(Math.Pow((k - i) * gridSize, 2) + Math.Pow((l - j) * gridSize, 2) + Math.Pow(data2D[i, j, 0] - data2D[k, l, 0], 2)) < eigenFeatureDiameter)
+									if (data2DMask[k, l] && Math.Sqrt(Math.Pow((k - i) * gridSize, 2) + Math.Pow((l - j) * gridSize, 2) + Math.Pow(data2D[i, j, (byte)feature.Height] - data2D[k, l, (byte)feature.Height], 2)) < eigenFeatureDiameter)
 									{
-										neighborList.Add(new double[3] { k * gridSize, l * gridSize, data2D[k, l, 0] });
+										neighborList.Add(new double[3] { k * gridSize, l * gridSize, data2D[k, l, (byte)feature.Height] });
 									}
 								}
 							}
@@ -277,13 +280,13 @@ namespace Core
 							double Sphericity = eigenValues[0].Magnitude / eigenValues[2].Magnitude;
 
 							if (!double.IsNaN(Linearity))
-								data2D[i, j, 2] = Linearity;
+								data2D[i, j, (byte)feature.Linearity] = Linearity;
 
 							if (!double.IsNaN(Planarity))
-								data2D[i, j, 3] = Planarity;
+								data2D[i, j, (byte)feature.Planarity] = Planarity;
 
 							if (!double.IsNaN(Sphericity))
-								data2D[i, j, 4] = Sphericity;
+								data2D[i, j, (byte)feature.Sphericity] = Sphericity;
 						}
 					}
 				}
@@ -299,7 +302,7 @@ namespace Core
 			double annularRangeDistance = radiusMax / (double)annularNum;
 
 			data2DAnnularIndex = new byte[width, height];
-			annularFeature = new double[annularNum, annularfeatureDimension];
+			annularFeature = new double[featureDimension, annularNum];
 
 			double[,] data2DDistance = new double[width, height];
 
@@ -314,10 +317,10 @@ namespace Core
 					//計算annular統計值
 					if (data2DAnnularIndex[i, j] < annularNum)
 					{
-						annularFeature[data2DAnnularIndex[i, j], 0] += data2D[i, j, 0];
-						for (int k = 1; k < annularfeatureDimension; k++)
+						annularFeature[0, data2DAnnularIndex[i, j]] += data2D[i, j, (byte)feature.Height];
+						for (int k = 1; k < featureDimension; k++)
 						{
-							annularFeature[data2DAnnularIndex[i, j], k] += data2D[i, j, k];
+							annularFeature[k, data2DAnnularIndex[i, j]] += data2D[i, j, k];
 						}
 					}
 				}
@@ -334,16 +337,16 @@ namespace Core
 			{
 				for (int j = 0; j < height; j++)
 				{
-					data2DAvg[i, j, 0] = data2D[i, j, 0] * (i + 1);
-					data2DAvg[i, j, 1] = data2D[i, j, 0] * (j + 1);
+					data2DAvg[i, j, 0] = data2D[i, j, (byte)feature.Height] * (i + 1);
+					data2DAvg[i, j, 1] = data2D[i, j, (byte)feature.Height] * (j + 1);
 				}
 			}
 
 			//計算中心點(z因為要算中心而不是表面，所以要除以2)
-			double zSum = Enumerable.Range(0, width * height).Select(i => data2D[i % width, i / width, 0]).Sum();
+			double zSum = Enumerable.Range(0, width * height).Select(i => data2D[i % width, i / width, (byte)feature.Height]).Sum();
 			xAvg = (int)Math.Round(Enumerable.Range(0, width * height).Select(i => data2DAvg[i % width, i / width, 0]).Sum() / zSum) - 1;
 			yAvg = (int)Math.Round(Enumerable.Range(0, width * height).Select(i => data2DAvg[i % width, i / width, 1]).Sum() / zSum) - 1;
-			zAvg = (Enumerable.Range(0, width * height).Select(i => data2D[i % width, i / width, 0]).Sum() / 2) / Enumerable.Range(0, width * height).Where(i => data2DMask[i % width, i / width] == true).Count();
+			zAvg = (Enumerable.Range(0, width * height).Select(i => data2D[i % width, i / width, (byte)feature.Height]).Sum() / 2) / Enumerable.Range(0, width * height).Where(i => data2DMask[i % width, i / width] == true).Count();
 		}
 
 		protected void DisplayCenter()
@@ -352,7 +355,7 @@ namespace Core
 			{
 				for (int j = yAvg - 1; j <= yAvg + 1; j++)
 				{
-					data2D[i, j, 0] = zMinAdj;
+					data2D[i, j, (byte)feature.Height] = zMinAdj;
 				}
 			}
 		}
@@ -360,20 +363,16 @@ namespace Core
 	}
 
 	//derived from coreClass
-	class objClass : coreClass
+	public class objClass : coreClass
 	{
-		public ObjMesh model { get; private set; }
-		public float[] pixels { get; private set; }
-
 		public objClass(string fileName) : base(fileName)
 		{
 		}
 
-		public override bool GenerateRangeImage(double gridSize)
+		public override bool GenerateRangeImage()
 		{
-			this.gridSize = gridSize;
-
-
+			ObjMesh model;
+			float[] pixels;
 			Vector3d eye, center, up;
 
 			try
@@ -382,10 +381,10 @@ namespace Core
 			}
 			catch (Exception)
 			{
+
 				rangeImg = null;
 				return false;
 			}
-
 
 
 			ObjMesh.ObjVertex[] v = model.Vertices;
@@ -453,7 +452,7 @@ namespace Core
 				{
 					for (int j = 0; j < height; j++)
 					{
-						data2D[i, j, 0] = pixels[(height - 1 - j) * width + i] * zRange;
+						data2D[i, j, (byte)feature.Height] = pixels[(height - 1 - j) * width + i] * zRange;
 						if (pixels[(height - 1 - j) * width + i] != zMinAdj)
 							data2DMask[i, j] = true;
 						else
@@ -470,6 +469,20 @@ namespace Core
 
 				rangeImg = utilClass.Data2Bitmap(data2D, 0);
 
+				int thumbnailImgWidth, thumbnailImgHeight;
+				if (width >= height)
+				{
+					thumbnailImgWidth = thumbnailImgMaxSize;
+					thumbnailImgHeight = (int)((double)height / ((double)width / (double)thumbnailImgMaxSize));
+				}
+				else
+				{
+					thumbnailImgWidth = (int)((double)width / ((double)height / (double)thumbnailImgMaxSize));
+					thumbnailImgHeight = thumbnailImgMaxSize;
+				}
+				rangeThumbnailImg = (Bitmap)rangeImg.GetThumbnailImage(thumbnailImgWidth, thumbnailImgHeight, null, IntPtr.Zero);
+
+
 				return true;
 			}
 
@@ -477,14 +490,11 @@ namespace Core
 	}
 	
 	//derived from coreClass
-	class xyzClass : coreClass
+	public class xyzClass : coreClass
 	{
-		public StructuringElementEx StructEle { get; set; }
-		public int structEleSize { get; set; }
-		public int MorIterNum { get; set; }
-		public Emgu.CV.CvEnum.CV_ELEMENT_SHAPE structEleShape { get; set; }
-
-		public double[,] pcArray { get; private set; } //點雲陣列
+		public static int structEleSize { get; set; }
+		public static int MorIterNum { get; set; }
+		public static Emgu.CV.CvEnum.CV_ELEMENT_SHAPE structEleShape { get; set; }
 
 		private struct PointCloud
 		{
@@ -494,20 +504,15 @@ namespace Core
 
 		public xyzClass(string fileName) : base(fileName)
 		{
-			structEleSize = 7;
-			MorIterNum = 2;
-			structEleShape = Emgu.CV.CvEnum.CV_ELEMENT_SHAPE.CV_SHAPE_RECT;
+// 			structEleSize = 7;
+// 			MorIterNum = 2;
+// 			structEleShape = Emgu.CV.CvEnum.CV_ELEMENT_SHAPE.CV_SHAPE_RECT;
 		}
 
-		public override bool GenerateRangeImage(double gridSize)
+		public override bool GenerateRangeImage()
 		{
-			this.gridSize = gridSize;
-
-
-
-			//點雲總數
-			int pcNum = 0;
-
+			int pcNum = 0;//點雲總數
+			double[,] pcArray;//點雲陣列
 
 
 			//計算總行數
@@ -590,7 +595,7 @@ namespace Core
 			{
 				for (int j = 0; j < height; j++)
 				{
-					data2D[i, j, 0] = zMaxArray[i, height - j - 1].z - zMin;
+					data2D[i, j, (byte)feature.Height] = zMaxArray[i, height - j - 1].z - zMin;
 				}
 			}
 
@@ -603,12 +608,11 @@ namespace Core
 				{
 					for (int j = 0; j < height; j++)
 					{
-						emguImg.Data[j, i, 0] = data2D[i, j, 0];
+						emguImg.Data[j, i, 0] = data2D[i, j, (byte)feature.Height];
 					}
 				}
 
-
-				StructEle = new StructuringElementEx(structEleSize, structEleSize, (structEleSize - 1) / 2, (structEleSize - 1) / 2, structEleShape);
+				StructuringElementEx StructEle = new StructuringElementEx(structEleSize, structEleSize, (structEleSize - 1) / 2, (structEleSize - 1) / 2, structEleShape);
 				CvInvoke.cvDilate(emguImg, emguImg, StructEle, MorIterNum);
 				CvInvoke.cvErode(emguImg, emguImg, StructEle, MorIterNum);
 
@@ -617,7 +621,7 @@ namespace Core
 				{
 					for (int j = 0; j < height; j++)
 					{
-						data2D[i, j, 0] = emguImg.Data[j, i, 0];
+						data2D[i, j, (byte)feature.Height] = emguImg.Data[j, i, 0];
 					}
 				}
 			}
@@ -626,7 +630,7 @@ namespace Core
 			{
 				for (int j = 0; j < height; j++)
 				{
-					if (data2D[i, j, 0] != zMinAdj)
+					if (data2D[i, j, (byte)feature.Height] != zMinAdj)
 						data2DMask[i, j] = true;
 					else
 						data2DMask[i, j] = false;
@@ -642,11 +646,24 @@ namespace Core
 
 			rangeImg = utilClass.Data2Bitmap(data2D, 0);
 
+			int thumbnailImgWidth, thumbnailImgHeight;
+			if (width >= height)
+			{
+				thumbnailImgWidth = thumbnailImgMaxSize;
+				thumbnailImgHeight = (int)((double)height / ((double)width / (double)thumbnailImgMaxSize));
+			}
+			else
+			{
+				thumbnailImgWidth = (int)((double)width / ((double)height / (double)thumbnailImgMaxSize));
+				thumbnailImgHeight = thumbnailImgMaxSize;
+			}
+			rangeThumbnailImg = (Bitmap)rangeImg.GetThumbnailImage(thumbnailImgWidth, thumbnailImgHeight, null, IntPtr.Zero);
+
 			return true;
 		}
 	}
 
-	class utilClass
+	public class utilClass
 	{
 		static public Bitmap Data2Bitmap(double[,,] data2D, int featureIndex)
 		{
@@ -675,5 +692,31 @@ namespace Core
 			return outputImg;
 		}
 
+		static public Bitmap ResizeBitmap2Square(Bitmap originalImage)
+		{
+			int width = originalImage.Width;
+			int height = originalImage.Height;
+			int newWidth, newHeight, xCorner, yCorner;
+
+			if (width >= height)
+			{
+				newWidth = newHeight = width;
+				xCorner = 0;
+				yCorner = (newWidth - height) / 2;
+			}
+			else
+			{
+				newWidth = newHeight = height;
+				xCorner = (newHeight - width) / 2;
+				yCorner = 0;
+			}
+
+			Bitmap squareImage = new Bitmap(newWidth, newHeight);
+			Graphics g = Graphics.FromImage(squareImage);
+			g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.NearestNeighbor;
+			g.Clear(Color.White);
+			g.DrawImage(originalImage, xCorner, yCorner);
+			return squareImage;
+		}
 	}
 }

@@ -1,35 +1,34 @@
-using System;
+//using System;
 using System.IO;
 using System.Collections.Generic;
 using OpenTK.Math;
 
 public class ObjMeshLoader
 {
-    public static bool Load(ObjMesh mesh, string fileName)
+    public bool Load(ObjMesh mesh, string fileName)
     {
         try
         {
             using (StreamReader streamReader = new StreamReader(fileName))
             {
                 Load(mesh, streamReader);
-                streamReader.Close();
                 return true;
             }
         }
         catch { return false; }
     }
 
-    static char[] splitCharacters = new char[] { ' ' };
+    char[] splitCharacters = new char[] { ' ' };
 
-    static List<Vector3> vertices;
-    static List<Vector3> normals;
-    static List<Vector2> texCoords;
-    static Dictionary<ObjMesh.ObjVertex, int> objVerticesIndexDictionary;
-    static List<ObjMesh.ObjVertex> objVertices;
-    static List<ObjMesh.ObjTriangle> objTriangles;
-    static List<ObjMesh.ObjQuad> objQuads;
+    List<Vector3> vertices;
+    List<Vector3> normals;
+    List<Vector2> texCoords;
+    Dictionary<ObjMesh.ObjVertex, int> objVerticesIndexDictionary;
+    List<ObjMesh.ObjVertex> objVertices;
+    List<ObjMesh.ObjTriangle> objTriangles;
+    List<ObjMesh.ObjQuad> objQuads;
 
-    static void Load(ObjMesh mesh, TextReader textReader)
+	void Load(ObjMesh mesh, TextReader textReader)
     {
         vertices = new List<Vector3>();
         normals = new List<Vector3>();
@@ -58,7 +57,8 @@ public class ObjMeshLoader
                     float z = float.Parse(parameters[3]);
                     vertices.Add(new Vector3(x, y, z));
                     break;
-
+				
+				/*
                 case "vt": // TexCoord
                     float u = float.Parse(parameters[1]);
                     float v = float.Parse(parameters[2]);
@@ -71,6 +71,7 @@ public class ObjMeshLoader
                     float nz = float.Parse(parameters[3]);
                     normals.Add(new Vector3(nx, ny, nz));
                     break;
+				*/
 
                 case "f":
                     switch (parameters.Length)
@@ -109,8 +110,8 @@ public class ObjMeshLoader
         objQuads = null;
     }
 
-    static char[] faceParamaterSplitter = new char[] { '/' };
-    static int ParseFaceParameter(string faceParameter)
+	char[] faceParamaterSplitter = new char[] { '/' };
+	int ParseFaceParameter(string faceParameter)
     {
         Vector3 vertex = new Vector3();
         Vector2 texCoord = new Vector2();
@@ -142,14 +143,18 @@ public class ObjMeshLoader
         return FindOrAddObjVertex(ref vertex, ref texCoord, ref normal);
     }
 
-    static int FindOrAddObjVertex(ref Vector3 vertex, ref Vector2 texCoord, ref Vector3 normal)
+	int FindOrAddObjVertex(ref Vector3 vertex, ref Vector2 texCoord, ref Vector3 normal)
     {
         ObjMesh.ObjVertex newObjVertex = new ObjMesh.ObjVertex();
         newObjVertex.Vertex = vertex;
         newObjVertex.TexCoord = texCoord;
         newObjVertex.Normal = normal;
 
-        int index;
+		objVertices.Add(newObjVertex);
+		return objVertices.Count - 1;
+
+		/*
+		int index;
         if (objVerticesIndexDictionary.TryGetValue(newObjVertex, out index))
         {
             return index;
@@ -160,5 +165,6 @@ public class ObjMeshLoader
             objVerticesIndexDictionary[newObjVertex] = objVertices.Count - 1;
             return objVertices.Count - 1;
         }
+		*/
     }
 }

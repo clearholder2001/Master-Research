@@ -7,7 +7,8 @@ public class ObjMesh
 {
     public ObjMesh(string fileName)
     {
-        ObjMeshLoader.Load(this, fileName);
+		ObjMeshLoader objMeshLoader = new ObjMeshLoader();
+		objMeshLoader.Load(this, fileName);
     }
 
     public ObjVertex[] Vertices
