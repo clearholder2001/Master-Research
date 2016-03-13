@@ -37,9 +37,6 @@ using Emgu.CV.Structure;
 
 using MathNet.Numerics.LinearAlgebra;
 
-// using MathWorks.MATLAB.NET.Arrays;
-// using xyzMatlabTool;
-
 namespace Core
 {
 	//Base class
@@ -47,6 +44,7 @@ namespace Core
 	{
 		public string fileName { get; private set; }
 		public double eigenFeatureDiameter { get; private set; }
+		
 
 		public double[,,] data2D { get; protected set; }
 		public bool[,] data2DMask { get; protected set; }
@@ -55,7 +53,7 @@ namespace Core
 		public Bitmap rangeImg { get; protected set; }
 		public Bitmap rangeThumbnailImg { get; protected set; }
 		public Bitmap featureImg { get; protected set; }
-		
+
 		public double xMax { get; protected set; }
 		public double xMin { get; protected set; }
 		public double yMax { get; protected set; }
@@ -81,19 +79,23 @@ namespace Core
 		public static int annularNum { get; set; }
 		public enum feature : byte { Height, Edge, Linearity, Planarity, Sphericity }
 		public static int featureDimension = Enum.GetValues(typeof(feature)).Length;
+		public static int laplacianAperture;
+		public static int gaussianAperture;
 		public static int eigenFeatureDiameterMultiple;
-		public static int thumbnailImgMaxSize;
 		public static bool ifDisplayCenter;
+		public static int borderAdditionWidth;
+		public static int thumbnailImgMaxSize;
 
 
 		public coreClass(string fileName)
 		{
 			this.fileName = fileName;
-// 			gridSize = 0.1;
-// 			annularNum = 10;
-// 			eigenFeatureDiameterMultiple = 3;
+			//gridSize = 0.1;
+			//annularNum = 10;
+			//eigenFeatureDiameterMultiple = 3;
+			//ifDisplayCenter = false;
+			borderAdditionWidth = 10;
 			thumbnailImgMaxSize = 100;
-			ifDisplayCenter = false;
 		}
 
 		public virtual bool GenerateRangeImage()
@@ -107,23 +109,28 @@ namespace Core
 
 			if (Path.GetExtension(fileName) == ".obj")
 				message += "Type: polygonal model\n";
-			else
+			else if (Path.GetExtension(fileName) == ".xyz")
 				message += "Type: point cloud\n";
 
 			message += "File path: " + fileName + "\n";
 			message += "GridSize: " + gridSize + "\n";
+			message += "AnnularNum: " + annularNum + "\n";
+			message += "LaplacianAperture: " + laplacianAperture + "\n";
+			message += "GaussianAperture: " + gaussianAperture + "\n";
+			message += "EigenFeatureDiameterMultiple: " + eigenFeatureDiameterMultiple + "\n";
 			message += "Width: " + width + "\n";
 			message += "Height: " + height + "\n";
-			message += "xMax: " + xMax + "\txMin: " + xMin + "\n";
-			message += "yMax: " + yMax + "\tyMin: " + yMin + "\n";
-			message += "zMax: " + zMax + "\tzMin: " + zMin + "\n";
-			message += "zMaxAdj: " + zMaxAdj + "\tzMinAdj: " + zMinAdj + "\n";
-			message += "xCenter: " + (double)xAvg / (double)(width - 1) + "\n";
-			message += "yCenter: " + (double)yAvg / (double)(height - 1) + "\n";
-			message += "zCenter: " + zAvg + "\n";
-			message += "radiusMax: " + radiusMax + " m\n";
-			message += "totalArea: " + totalArea + " m2\n";
-			message += "totalVol: " + totalVol + " m3\n";
+			message += "xMax: " + String.Format("{0:0.000}", xMax) + "\t\txMin: " + String.Format("{0:0.000}", xMin) + "\n";
+			message += "yMax: " + String.Format("{0:0.000}", yMax) + "\t\tyMin: " + String.Format("{0:0.000}", yMin) + "\n";
+			message += "zMax: " + String.Format("{0:0.000}", zMax) + "\t\tzMin: " + String.Format("{0:0.000}", zMin) + "\n";
+			message += "zMaxAdj: " + String.Format("{0:0.000}", zMaxAdj) + "\t\tzMinAdj: " + String.Format("{0:0.000}", zMinAdj) + "\n";
+			message += "xCenter: " + String.Format("{0:0.000}", (double)xAvg / (double)(width - 1)) + "\n";
+			message += "yCenter: " + String.Format("{0:0.000}", (double)yAvg / (double)(height - 1)) + "\n";
+			message += "zCenter: " + String.Format("{0:0.000}", zAvg) + "\n";
+			message += "radiusMax: " + String.Format("{0:0.000}", radiusMax) + " m\n";
+			message += "totalArea: " + String.Format("{0:0.000}", totalArea) + " m2\n";
+			message += "totalVol: " + String.Format("{0:0.000}", totalVol) + " m3\n";
+
 
 			return message;
 		}
@@ -133,8 +140,8 @@ namespace Core
 			string series = string.Empty;
 
 			series += zAvg + "\n";
-			series += totalArea +"\n";
-			series += totalVol +"\n";
+			series += totalArea + "\n";
+			series += totalVol + "\n";
 			series += radiusMax + "\n";
 
 
@@ -142,7 +149,7 @@ namespace Core
 			{
 				for (int j = 0; j < annularNum; j++)
 				{
-					series += annularFeature[i, j] + "\n";	
+					series += annularFeature[i, j] + "\n";
 				}
 			}
 
@@ -187,8 +194,11 @@ namespace Core
 					}
 				}
 
+				//Canny
 				//Image<Gray, byte> emguCannyImg = emguImg.Canny(10.0, 15.0);
-				Image<Gray, float> emguLoGImg = emguImg.SmoothGaussian(5).Laplace(3);
+
+				//Loplacian of Gaussian (LoG)
+				Image<Gray, float> emguLoGImg = emguImg.SmoothGaussian(gaussianAperture).Laplace(laplacianAperture);
 
 				for (int i = 0; i < width; i++)
 				{
@@ -202,12 +212,28 @@ namespace Core
 
 
 			//Eigen feature
-			eigenFeatureDiameter = gridSize * eigenFeatureDiameterMultiple;
+			if (eigenFeatureDiameterMultiple >= 1)
+			{
+				eigenFeatureDiameter = gridSize * eigenFeatureDiameterMultiple;
+			}
+			else
+			{
+				for (int i = 0; i < width; i++)
+				{
+					for (int j = 0; j < height; j++)
+					{
+						data2D[i, j, (byte)feature.Linearity] = 0.0;
+						data2D[i, j, (byte)feature.Planarity] = 0.0;
+						data2D[i, j, (byte)feature.Sphericity] = 0.0;
+					}
+				}
+				return;
+			}
 			//List<double[]> neighborList = new List<double[]>();
 			//List<List<double[]>> tt = new List<List<double[]>>();
 			//List<Vector<Complex>> ttp = new List<Vector<Complex>>();
-			Parallel.For(0, width - 1, i =>
 			//for (int i = 0; i < width; i++)
+			Parallel.For(0, width - 1, i =>
 			{
 				for (int j = 0; j < height; j++)
 				{
@@ -221,72 +247,84 @@ namespace Core
 						{
 							List<double[]> neighborList = new List<double[]>();
 							//neighborList.Clear();
+
 							for (int k = i - eigenFeatureDiameterMultiple; k <= i + eigenFeatureDiameterMultiple; k++)
 							{
 								for (int l = j - eigenFeatureDiameterMultiple; l <= j + eigenFeatureDiameterMultiple; l++)
 								{
-
 									if (data2DMask[k, l] && Math.Sqrt(Math.Pow((k - i) * gridSize, 2) + Math.Pow((l - j) * gridSize, 2) + Math.Pow(data2D[i, j, (byte)feature.Height] - data2D[k, l, (byte)feature.Height], 2)) < eigenFeatureDiameter)
 									{
-										neighborList.Add(new double[3] { k * gridSize, l * gridSize, data2D[k, l, (byte)feature.Height] });
+										neighborList.Add(new double[3] { k * gridSize, l * gridSize, data2D[k, l, (byte)feature.Height]});
 									}
 								}
 							}
 
-							if (neighborList.Count == 0)
-								continue;
-
-							double[] mean = new double[3] { neighborList.Select(a => a[0]).Average(), neighborList.Select(a => a[1]).Average(), neighborList.Select(a => a[2]).Average() };
-
-							foreach (double[] pc in neighborList)
+							if (neighborList.Count < 2)
 							{
-								pc[0] -= mean[0];
-								pc[1] -= mean[1];
-								pc[2] -= mean[2];
+								data2D[i, j, (byte)feature.Linearity] = 0;
+								data2D[i, j, (byte)feature.Planarity] = 0;
+								data2D[i, j, (byte)feature.Sphericity] = 0;
+							}
+							else
+							{
+								double[] mean = new double[3] { neighborList.Select(a => a[0]).Average(), neighborList.Select(a => a[1]).Average(), neighborList.Select(a => a[2]).Average() };
+
+								foreach (double[] pc in neighborList)
+								{
+									pc[0] -= mean[0];
+									pc[1] -= mean[1];
+									pc[2] -= mean[2];
+								}
+
+								MathNet.Numerics.LinearAlgebra.Matrix<double> matrixP = MathNet.Numerics.LinearAlgebra.Matrix<double>.Build.DenseOfColumnArrays(neighborList.ToArray());
+
+								//MathNet.Numerics.LinearAlgebra.Matrix<double> matrixCovariance = MathNet.Numerics.LinearAlgebra.Matrix<double>.Build.DenseOfColumnArrays(neighborList.ToArray());
+								//matrixCovariance = matrixCovariance * matrixCovariance.Transpose() / neighborList.Count;
+
+								MathNet.Numerics.LinearAlgebra.Matrix<double> matrixCovariance = MathNet.Numerics.LinearAlgebra.Matrix<double>.Build.Dense(3, 3, 0.0);
+
+								for (int n = 0; n < neighborList.Count; n++)
+								{
+									matrixCovariance += matrixP.SubMatrix(0, 3, n, 1) * matrixP.SubMatrix(0, 3, n, 1).Transpose();
+								}
+
+								MathNet.Numerics.LinearAlgebra.Matrix<double> matrixTT = matrixCovariance;
+
+
+								matrixCovariance = matrixCovariance.Divide(neighborList.Count);
+
+								var eigenResult = matrixCovariance.Evd();
+
+								Vector<Complex> eigenValues = eigenResult.EigenValues;
+
+								/*
+								if (eigenValues[0].Real < 0 || eigenValues[1].Real < 0 || eigenValues[2].Real < 0)
+								{
+									tt.Add(neighborList);
+									ttp.Add(eigenValues);
+								}
+								*/
+
+								double Linearity = (eigenValues[2].Magnitude - eigenValues[1].Magnitude) / eigenValues[2].Magnitude;
+								double Planarity = (eigenValues[1].Magnitude - eigenValues[0].Magnitude) / eigenValues[2].Magnitude;
+								double Sphericity = eigenValues[0].Magnitude / eigenValues[2].Magnitude;
+
+								if (!double.IsNaN(Linearity))
+									data2D[i, j, (byte)feature.Linearity] = Linearity;
+								else
+									data2D[i, j, (byte)feature.Linearity] = 0;
+
+								if (!double.IsNaN(Planarity))
+									data2D[i, j, (byte)feature.Planarity] = Planarity;
+								else
+									data2D[i, j, (byte)feature.Planarity] = 0;
+
+								if (!double.IsNaN(Sphericity))
+									data2D[i, j, (byte)feature.Sphericity] = Sphericity;
+								else
+									data2D[i, j, (byte)feature.Sphericity] = 0;
 							}
 
-							MathNet.Numerics.LinearAlgebra.Matrix<double> matrixP = MathNet.Numerics.LinearAlgebra.Matrix<double>.Build.DenseOfColumnArrays(neighborList.ToArray());
-
-// 							MathNet.Numerics.LinearAlgebra.Matrix<double> matrixCovariance = MathNet.Numerics.LinearAlgebra.Matrix<double>.Build.DenseOfColumnArrays(neighborList.ToArray());
-// 
-// 							matrixCovariance = matrixCovariance * matrixCovariance.Transpose() / neighborList.Count;
-
-							MathNet.Numerics.LinearAlgebra.Matrix<double> matrixCovariance = MathNet.Numerics.LinearAlgebra.Matrix<double>.Build.Dense(3, 3, 0.0);
-
-							for (int n = 0; n < neighborList.Count; n++)
-							{
-								matrixCovariance += matrixP.SubMatrix(0, 3, n, 1) * matrixP.SubMatrix(0, 3, n, 1).Transpose();
-							}
-
-							MathNet.Numerics.LinearAlgebra.Matrix<double> matrixTT = matrixCovariance;
-
-
-							matrixCovariance = matrixCovariance.Divide(neighborList.Count);
-
-							var eigenResult = matrixCovariance.Evd();
-
-							Vector<Complex> eigenValues = eigenResult.EigenValues;
-
-							/*
-							if (eigenValues[0].Real < 0 || eigenValues[1].Real < 0 || eigenValues[2].Real < 0)
-							{
-								tt.Add(neighborList);
-								ttp.Add(eigenValues);
-							}
-							*/
-
-							double Linearity = (eigenValues[2].Magnitude - eigenValues[1].Magnitude) / eigenValues[2].Magnitude;
-							double Planarity = (eigenValues[1].Magnitude - eigenValues[0].Magnitude) / eigenValues[2].Magnitude;
-							double Sphericity = eigenValues[0].Magnitude / eigenValues[2].Magnitude;
-
-							if (!double.IsNaN(Linearity))
-								data2D[i, j, (byte)feature.Linearity] = Linearity;
-
-							if (!double.IsNaN(Planarity))
-								data2D[i, j, (byte)feature.Planarity] = Planarity;
-
-							if (!double.IsNaN(Sphericity))
-								data2D[i, j, (byte)feature.Sphericity] = Sphericity;
 						}
 					}
 				}
@@ -301,6 +339,20 @@ namespace Core
 
 			double annularRangeDistance = radiusMax / (double)annularNum;
 
+			/*
+			//equal area
+			double[] annularRangeDistance = new double[annularNum + 1];
+			double equalArea = Math.Pow(radiusMax, 2) / annularNum;
+
+			annularRangeDistance[0] = 0;
+			annularRangeDistance[1] = Math.Sqrt(equalArea);
+
+			for (int i = 2; i < annularRangeDistance.Length; i++)
+			{
+				annularRangeDistance[i] = Math.Sqrt(equalArea + Math.Pow(annularRangeDistance[i - 1], 2));
+			}
+			*/
+
 			data2DAnnularIndex = new byte[width, height];
 			annularFeature = new double[featureDimension, annularNum];
 
@@ -314,18 +366,52 @@ namespace Core
 					data2DDistance[i, j] = Math.Sqrt(Math.Pow(i - xAvg, 2) + Math.Pow(j - yAvg, 2)) * gridSize;
 					data2DAnnularIndex[i, j] = (byte)Math.Floor(data2DDistance[i, j] / annularRangeDistance);
 
+					/*
+					//equal area
+					if (data2DDistance[i, j] <= radiusMax)
+					{
+						for (int interval = 0; interval < annularRangeDistance.Length - 1; interval++)
+						{
+							double smallRadius = annularRangeDistance[interval];
+							double largeRadius = annularRangeDistance[interval + 1];
+
+							if (data2DDistance[i, j] >= smallRadius && data2DDistance[i, j] < largeRadius)
+							{
+								data2DAnnularIndex[i, j] = (byte)interval;
+								break;
+							}
+						}
+					}
+					else
+					{
+						data2DAnnularIndex[i, j] = (byte)annularNum;
+					}
+					*/
+
+
 					//計算annular統計值
 					if (data2DAnnularIndex[i, j] < annularNum)
 					{
-						annularFeature[0, data2DAnnularIndex[i, j]] += data2D[i, j, (byte)feature.Height];
-						for (int k = 1; k < featureDimension; k++)
-						{
-							annularFeature[k, data2DAnnularIndex[i, j]] += data2D[i, j, k];
-						}
+						//annularFeature[0, data2DAnnularIndex[i, j]] += data2D[i, j, (byte)feature.Height];
+						if (data2D[i, j, (byte)feature.Height] != 0)
+							annularFeature[(byte)feature.Height, data2DAnnularIndex[i, j]] += (zMaxAdj - data2D[i, j, (byte)feature.Height]);
+
+						annularFeature[(byte)feature.Edge, data2DAnnularIndex[i, j]] += data2D[i, j, (byte)feature.Edge];
+						annularFeature[(byte)feature.Linearity, data2DAnnularIndex[i, j]] += data2D[i, j, (byte)feature.Linearity];
+						annularFeature[(byte)feature.Planarity, data2DAnnularIndex[i, j]] += data2D[i, j, (byte)feature.Planarity];
+						annularFeature[(byte)feature.Sphericity, data2DAnnularIndex[i, j]] += data2D[i, j, (byte)feature.Sphericity];
 					}
 				}
 			}
 
+			//apply annular weight
+			for (int i = 0; i < coreClass.featureDimension; i++)
+			{
+				for (int j = 1; j <= coreClass.annularNum; j++)
+				{
+					annularFeature[i, j - 1] /= ((j + (j - 1)) * (j - (j - 1)));
+				}
+			}
 		}
 
 
@@ -401,8 +487,8 @@ namespace Core
 
 
 
-			width = (int)Math.Ceiling((Math.Ceiling(xMax) - Math.Floor(xMin)) / gridSize);
-			height = (int)Math.Ceiling((Math.Ceiling(yMax) - Math.Floor(yMin)) / gridSize);
+			width = (int)Math.Ceiling((Math.Ceiling(xMax) - Math.Floor(xMin)) / gridSize) + (borderAdditionWidth * 2);
+			height = (int)Math.Ceiling((Math.Ceiling(yMax) - Math.Floor(yMin)) / gridSize) + (borderAdditionWidth * 2);
 
 			eye = new Vector3d(0, 0, zMax);
 			center = new Vector3d(0, 0, 0);
@@ -410,8 +496,19 @@ namespace Core
 
 
 
-			using (var game = new GameWindow(width, height))
+			using (GameWindow window = new GameWindow(1, 1))
 			{
+				uint FboHandle;
+				uint DepthRenderbuffer;
+
+				GL.Ext.GenRenderbuffers(1, out DepthRenderbuffer);
+				GL.Ext.BindRenderbuffer(RenderbufferTarget.RenderbufferExt, DepthRenderbuffer);
+				GL.Ext.RenderbufferStorage(RenderbufferTarget.RenderbufferExt, (RenderbufferStorage)All.DepthComponent32, width, height);
+
+				GL.Ext.GenFramebuffers(1, out FboHandle);
+				GL.Ext.BindFramebuffer(FramebufferTarget.FramebufferExt, FboHandle);
+				GL.Ext.FramebufferRenderbuffer(FramebufferTarget.FramebufferExt, FramebufferAttachment.DepthAttachmentExt, RenderbufferTarget.RenderbufferExt, DepthRenderbuffer);
+
 				GL.Enable(EnableCap.DepthTest);
 				GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
 
@@ -424,7 +521,7 @@ namespace Core
 
 				GL.MatrixMode(MatrixMode.Projection);
 				GL.LoadIdentity();
-				GL.Ortho(Math.Floor(xMin), Math.Ceiling(xMax), Math.Floor(yMin), Math.Ceiling(yMax), 0, zMax - zMin);
+				GL.Ortho(Math.Floor(xMin - borderAdditionWidth * gridSize), Math.Ceiling(xMax + borderAdditionWidth * gridSize), Math.Floor(yMin - borderAdditionWidth * gridSize), Math.Ceiling(yMax + borderAdditionWidth * gridSize), 0, zMax - zMin);
 
 
 				GL.MatrixMode(MatrixMode.Modelview);
@@ -456,7 +553,7 @@ namespace Core
 						if (pixels[(height - 1 - j) * width + i] != zMinAdj)
 							data2DMask[i, j] = true;
 						else
-							data2DMask[i, j] = false;						
+							data2DMask[i, j] = false;
 					}
 				}
 
@@ -485,10 +582,9 @@ namespace Core
 
 				return true;
 			}
-
 		}
 	}
-	
+
 	//derived from coreClass
 	public class xyzClass : coreClass
 	{
@@ -504,9 +600,9 @@ namespace Core
 
 		public xyzClass(string fileName) : base(fileName)
 		{
-// 			structEleSize = 7;
-// 			MorIterNum = 2;
-// 			structEleShape = Emgu.CV.CvEnum.CV_ELEMENT_SHAPE.CV_SHAPE_RECT;
+			// 			structEleSize = 7;
+			// 			MorIterNum = 2;
+			// 			structEleShape = Emgu.CV.CvEnum.CV_ELEMENT_SHAPE.CV_SHAPE_RECT;
 		}
 
 		public override bool GenerateRangeImage()
@@ -552,8 +648,8 @@ namespace Core
 			zRange = zMax - zMin;
 
 			//計算range image的長寬
-			width = (int)Math.Ceiling((Math.Ceiling(xMax) - Math.Floor(xMin)) / gridSize);
-			height = (int)Math.Ceiling((Math.Ceiling(yMax) - Math.Floor(yMin)) / gridSize);
+			width = (int)Math.Ceiling((Math.Ceiling(xMax) - Math.Floor(xMin)) / gridSize) + (borderAdditionWidth * 2);
+			height = (int)Math.Ceiling((Math.Ceiling(yMax) - Math.Floor(yMin)) / gridSize) + (borderAdditionWidth * 2);
 
 
 
@@ -577,8 +673,8 @@ namespace Core
 			int pcX, pcY;
 			for (int i = 0; i < pcNum; i++)
 			{
-				pcX = (int)Math.Floor((pcArray[i, 0] - xMin) / gridSize);
-				pcY = (int)Math.Floor((pcArray[i, 1] - yMin) / gridSize);
+				pcX = (int)Math.Floor((pcArray[i, 0] - (xMin - borderAdditionWidth * gridSize)) / gridSize);
+				pcY = (int)Math.Floor((pcArray[i, 1] - (yMin - borderAdditionWidth * gridSize)) / gridSize);
 				if (pcArray[i, 2] > zMaxArray[pcX, pcY].z)
 				{
 					zMaxArray[pcX, pcY].x = pcArray[i, 0];
@@ -611,6 +707,7 @@ namespace Core
 						emguImg.Data[j, i, 0] = data2D[i, j, (byte)feature.Height];
 					}
 				}
+
 
 				StructuringElementEx StructEle = new StructuringElementEx(structEleSize, structEleSize, (structEleSize - 1) / 2, (structEleSize - 1) / 2, structEleShape);
 				CvInvoke.cvDilate(emguImg, emguImg, StructEle, MorIterNum);

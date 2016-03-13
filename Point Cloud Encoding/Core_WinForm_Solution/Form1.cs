@@ -121,7 +121,7 @@ namespace Core_WinForm_Solution
 					foreach (string fileName in ofd.FileNames)
 					{
 						project.Add_polygonalModel_fileName(fileName);
-						listBox1.Items.Add(Path.GetFileName(fileName));
+						listBox1.Items.Add(Path.GetFileNameWithoutExtension(fileName));
 
 						project.ifGenerateFeature = false;
 					}
@@ -131,6 +131,9 @@ namespace Core_WinForm_Solution
 
 		private void updateParametersToolStripMenuItem_Click(object sender, EventArgs e)
 		{
+			project.ifGenerateFeature = false;
+			listView2.Clear();
+
 			if (!project.Set_parameter())
 			{
 				MessageBox.Show("Invalid parameter!");
@@ -167,6 +170,16 @@ namespace Core_WinForm_Solution
 			}
 		}
 
+		private void pictureBox1_DoubleClick(object sender, EventArgs e)
+		{
+			SaveFileDialog sfd = new SaveFileDialog();
+			sfd.Filter = "bmp files (*.bmp)|*.bmp";
+			if (sfd.ShowDialog() == DialogResult.OK)
+			{
+				pictureBox1.Image.Save(sfd.FileName, System.Drawing.Imaging.ImageFormat.Bmp);
+			}
+		}
+
 		private void listView1_MouseClick(object sender, MouseEventArgs e)
 		{
 			if (backgroundWorker_loadPolygonalModel.IsBusy || backgroundWorker_generateFeature.IsBusy)
@@ -198,6 +211,8 @@ namespace Core_WinForm_Solution
 			}
 
 			sw.Restart();
+
+			updateParametersToolStripMenuItem.PerformClick();
 
 			toolStripProgressBar1.Value = 0;
 			toolStripProgressBar1.Maximum = project.Return_polygonalModelFileName().Count;
@@ -248,12 +263,20 @@ namespace Core_WinForm_Solution
 			//記得button和listview要一起改
 			int selectedIndex = listView1.FocusedItem.Index;
 			List<string> fileNameList = project.Return_polygonalModelFileName();
+			if (fileNameList.Count == 0)
+			{
+				MessageBox.Show("Remove failed!");
+				return;
+			}
 			string fileName = fileNameList[selectedIndex];
 			if (!project.Delete_polygonalModel(fileName))
+			{
 				MessageBox.Show("Remove failed!");
+				return;
+			}
 			listBox1.Items.RemoveAt(selectedIndex);
-			imageList1.Images.RemoveAt(selectedIndex);
 			listView1.Items.RemoveAt(selectedIndex);
+			imageList1.Images.RemoveByKey(Path.GetFileNameWithoutExtension(fileName));
 		}
 
 		private void generateAnnularFeatureToolStripMenuItem_Click(object sender, EventArgs e)
@@ -266,6 +289,8 @@ namespace Core_WinForm_Solution
 
 			sw.Restart();
 
+			updateParametersToolStripMenuItem.PerformClick();
+
 			toolStripProgressBar1.Value = 0;
 			toolStripProgressBar1.Maximum = project.Return_polygonalModelFileName().Count + 1;
 
@@ -274,19 +299,40 @@ namespace Core_WinForm_Solution
 			backgroundWorker_generateFeature.RunWorkerAsync();
 		}
 
+		private void generateAnnularFeatureonlyForPointCloudToolStripMenuItem_Click(object sender, EventArgs e)
+		{
+			if (pictureBox1.Image == null)
+			{
+				MessageBox.Show("Please load file first!");
+				return;
+			}
+
+			sw.Restart();
+
+			updateParametersToolStripMenuItem.PerformClick();
+
+			project.Generate_feature_onlyPointCloud();
+
+			sw.Stop();
+
+			project.ifGenerateFeature = true;
+			
+			toolStripStatusLabel1.Text = "Generate annular feature done. (" + String.Format("{0:0.000}", sw.Elapsed.TotalSeconds) + "s)";
+		}
+
 		private void detailToolStripMenuItem_Click(object sender, EventArgs e)
 		{
-			Form2 DetailForm = new Form2();
+			Form2 DetailForm;
 
 			if (selectPointCloud)
 			{
 				xyzClass pointCloud = project.Return_pointCloudData();
-				DetailForm.PassObject(pointCloud);
+				DetailForm = new Form2(pointCloud);
 			}
 			else
 			{
 				objClass polygonalModel = project.Return_polygonalModelData(listView1.FocusedItem.Index);
-				DetailForm.PassObject(polygonalModel);
+				DetailForm = new Form2(polygonalModel);
 			}
 
 			DetailForm.Show();
@@ -318,10 +364,7 @@ namespace Core_WinForm_Solution
 						MessageBox.Show("Invalid number!");
 					}
 					break;
-				case 1:
-				case 2:
-				case 3:
-				case 4:
+				default:
 					try
 					{
 						project.parameter[comboBox2.SelectedIndex] = Convert.ToInt16(textBox2.Text);
@@ -330,8 +373,6 @@ namespace Core_WinForm_Solution
 					{
 						MessageBox.Show("Invalid number!");
 					}
-					break;
-				default:
 					break;
 			}
 		}
@@ -401,6 +442,8 @@ namespace Core_WinForm_Solution
 				project.usedFeature[i] = checkedListBox1.GetItemChecked(i);
 			}
 
+			project.sizeWeight = checkBox1.Checked;
+
 			listView2.Clear();
 
 			project.Retrieve_and_Rank();
@@ -436,16 +479,6 @@ namespace Core_WinForm_Solution
 			sw.Stop();
 		}
 
-		private void pictureBox1_DoubleClick(object sender, EventArgs e)
-		{
-			SaveFileDialog sfd = new SaveFileDialog();
-			sfd.Filter = "bmp files (*.bmp)|*.bmp";
-			if (sfd.ShowDialog() == DialogResult.OK)
-			{
-				pictureBox1.Image.Save(sfd.FileName, System.Drawing.Imaging.ImageFormat.Bmp);
-			}
-		}
-
 		//backgroundWorker_loadPolygonalModel
 		private void backgroundWorker_loadPolygonalModel_DoWork(object sender, DoWorkEventArgs e)
 		{
@@ -475,9 +508,10 @@ namespace Core_WinForm_Solution
 			for (int i = 0; i < listBox1.Items.Count; i++)
 			{
 				Bitmap img = utilClass.ResizeBitmap2Square(project.Get_rangeImage(i));
-				imageList1.Images.Add(img);
-				listView1.Items.Add(Path.GetFileNameWithoutExtension(listBox1.Items[i].ToString()));
-				listView1.Items[i].ImageIndex = i;
+				string key = Path.GetFileNameWithoutExtension(listBox1.Items[i].ToString());
+				imageList1.Images.Add(key, img);
+				listView1.Items.Add(key);
+				listView1.Items[i].ImageKey = key;
 			}
 
 			if (allinOneClickSignal)
@@ -510,7 +544,7 @@ namespace Core_WinForm_Solution
 			else
 			{
 				sw.Stop();
-				toolStripStatusLabel1.Text = "Generate feature done. (" + String.Format("{0:0.000}", sw.Elapsed.TotalSeconds) + "s)";
+				toolStripStatusLabel1.Text = "Generate annular feature done. (" + String.Format("{0:0.000}", sw.Elapsed.TotalSeconds) + "s)";
 			}
 
 			project.ifGenerateFeature = true;
@@ -520,5 +554,6 @@ namespace Core_WinForm_Solution
 				retrieveAndRankToolStripMenuItem.PerformClick();
 			}
 		}
+
 	}
 }

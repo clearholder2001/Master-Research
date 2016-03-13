@@ -63,6 +63,7 @@
 			// imageBox1
 			// 
 			this.imageBox1.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
+			this.imageBox1.FunctionalMode = Emgu.CV.UI.ImageBox.FunctionalModeOption.RightClickMenu;
 			this.imageBox1.Location = new System.Drawing.Point(12, 28);
 			this.imageBox1.Name = "imageBox1";
 			this.imageBox1.Size = new System.Drawing.Size(400, 400);
@@ -115,6 +116,8 @@
 			this.Controls.Add(this.imageBox1);
 			this.Controls.Add(this.panAndZoomPictureBox1);
 			this.Controls.Add(this.richTextBox1);
+			this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedDialog;
+			this.MaximizeBox = false;
 			this.Name = "Form2";
 			this.Text = "Feature";
 			this.Load += new System.EventHandler(this.Form2_Load);

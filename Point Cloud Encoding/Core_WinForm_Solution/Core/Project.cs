@@ -13,13 +13,16 @@ namespace Core
 		/// <summary>
 		/// default value
 		/// gridSize: 0.1m
-		/// annularNum: 10
-		/// eigen feature diameter multiple: 3
-		/// structure element size: 7
+		/// annularNum: 20
+		/// laplacian aperture: 7
+		/// gaussian aperture: 7
+		/// eigen feature diameter multiple: 5
+		/// structure element size: 5
+		/// morphology iteration number: 3
+		/// display center: false
 		/// structure element shape: rectangle
-		/// morphology iteration number: 2
 		/// </summary>
-		public enum parameterName : byte { Grid_Size, Annular_Number, Eigen_Feature_Diameter_Multiple, Structure_Element_Size, Morphology_Iteration_Number, Structure_Element_Shape }
+		public enum parameterName : byte { Grid_Size, Annular_Number, LoG_Laplacian_Aperture, LoG_Gaussian_Aperture, Eigen_Feature_Diameter_Multiple, Structure_Element_Size, Morphology_Iteration_Number, Display_Center, Structure_Element_Shape }
 		public double[] parameter = new double[Enum.GetValues(typeof(parameterName)).Length];
 
 		private xyzClass pointCloud;
@@ -31,6 +34,7 @@ namespace Core
 		public bool ifGenerateFeature { get; set; }
 		public bool[] usedFeature { get; set; }
 		public double[] featureWeight { get; set; }
+		public bool sizeWeight { get; set; }
 		public double[] rankingDistance { get; private set; }
 		public int[] rankingIndex { get; private set; }
 
@@ -43,10 +47,13 @@ namespace Core
 			//Set_annularNum(10);
 
 			parameter[(int)parameterName.Grid_Size] = 0.1;
-			parameter[(int)parameterName.Annular_Number] = 30;
-			parameter[(int)parameterName.Eigen_Feature_Diameter_Multiple] = 4;
+			parameter[(int)parameterName.Annular_Number] = 20;
+			parameter[(int)parameterName.LoG_Laplacian_Aperture] = 7;
+			parameter[(int)parameterName.LoG_Gaussian_Aperture] = 7;
+			parameter[(int)parameterName.Eigen_Feature_Diameter_Multiple] = 5;
 			parameter[(int)parameterName.Structure_Element_Size] = 5;
 			parameter[(int)parameterName.Morphology_Iteration_Number] = 3;
+			parameter[(int)parameterName.Display_Center] = 0;
 			parameter[(int)parameterName.Structure_Element_Shape] = (double)Emgu.CV.CvEnum.CV_ELEMENT_SHAPE.CV_SHAPE_RECT;
 
 			ifGenerateFeature = false;
@@ -62,8 +69,25 @@ namespace Core
 		{
 			try
 			{
+				if (((int)parameter[(int)parameterName.LoG_Laplacian_Aperture] % 2) == 0)
+					parameter[(int)parameterName.LoG_Laplacian_Aperture] += 1;
+				if (((int)parameter[(int)parameterName.LoG_Gaussian_Aperture] % 2) == 0)
+					parameter[(int)parameterName.LoG_Gaussian_Aperture] += 1;
+				if ((int)parameter[(int)parameterName.Display_Center] == 0)
+				{
+					parameter[(int)parameterName.Display_Center] = 0;
+					coreClass.ifDisplayCenter = false;
+				}
+				else
+				{
+					parameter[(int)parameterName.Display_Center] = 1;
+					coreClass.ifDisplayCenter = true;
+				}
+
 				coreClass.gridSize = parameter[(int)parameterName.Grid_Size];
 				coreClass.annularNum = (int)parameter[(int)parameterName.Annular_Number];
+				coreClass.laplacianAperture = (int)parameter[(int)parameterName.LoG_Laplacian_Aperture];
+				coreClass.gaussianAperture = (int)parameter[(int)parameterName.LoG_Gaussian_Aperture];
 				coreClass.eigenFeatureDiameterMultiple = (int)parameter[(int)parameterName.Eigen_Feature_Diameter_Multiple];
 				xyzClass.structEleSize = (int)parameter[(int)parameterName.Structure_Element_Size];
 				xyzClass.MorIterNum = (int)parameter[(int)parameterName.Morphology_Iteration_Number];
@@ -346,6 +370,19 @@ namespace Core
 		}
 
 		/// <summary>
+		/// generate feature of only point cloud
+		/// </summary>
+		/// <returns></returns>
+		public bool Generate_feature_onlyPointCloud()
+		{
+			if (!pointCloud.GenerateFeature())
+			{
+				return false;
+			}
+			return true;
+		}
+
+		/// <summary>
 		/// generate feature of both point cloud and polygonal model with progress report
 		/// </summary>
 		/// <param name="bw"></param>
@@ -531,6 +568,7 @@ namespace Core
 			}
 		}
 
+
 		/// <summary>
 		/// retrieve and rank
 		/// </summary>
@@ -568,7 +606,6 @@ namespace Core
 					if (usedFeature[i])
 					{
 						double sum = Enumerable.Range(0, coreClass.annularNum).Select(a => model.annularFeature[i, a]).Sum();
-						
 
 						for (int j = 0; j < coreClass.annularNum; j++)
 						{
@@ -594,6 +631,16 @@ namespace Core
 					distSum += Enumerable.Range(0, coreClass.annularNum).Select(a => Math.Abs(pointCloud_annulerFeature[j, a] - annulerFeatrue_list[i][j, a])).Sum() * featureWeight[j];
 				}
 				rankingDistance[i] = distSum;
+
+				//weight
+				if (sizeWeight)
+				{
+					double heightWeight = Math.Abs((polygonalModel_list[i].zRange - pointCloud.zRange) / pointCloud.zRange) + 1; 
+					double radiusWeight = Math.Abs((polygonalModel_list[i].radiusMax - pointCloud.radiusMax) / pointCloud.radiusMax) + 1;
+					double areaWeight = Math.Abs((polygonalModel_list[i].totalArea - pointCloud.totalArea) / pointCloud.totalArea) + 1;
+
+					rankingDistance[i] = rankingDistance[i] * heightWeight * Math.Pow(radiusWeight, 2) * areaWeight;
+				}
 			}
 
 			rankingIndex = rankingDistance.Select((value, index) => new { value, index }).OrderBy(a => a.value).Select(a => a.index).ToArray();
