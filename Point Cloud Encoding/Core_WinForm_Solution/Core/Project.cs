@@ -6,6 +6,7 @@ using System.Linq;
 using System.Threading.Tasks;
 // using System.Text;
 
+
 namespace Core
 {
 	public class Project
@@ -39,6 +40,7 @@ namespace Core
 		public int[] rankingIndex { get; private set; }
 
 
+
 		public Project()
 		{
 			polygonalModel_fileName = new List<string>();
@@ -50,7 +52,7 @@ namespace Core
 			parameter[(int)parameterName.Annular_Number] = 20;
 			parameter[(int)parameterName.LoG_Laplacian_Aperture] = 7;
 			parameter[(int)parameterName.LoG_Gaussian_Aperture] = 7;
-			parameter[(int)parameterName.Eigen_Feature_Diameter_Multiple] = 5;
+			parameter[(int)parameterName.Eigen_Feature_Diameter_Multiple] = 4;
 			parameter[(int)parameterName.Structure_Element_Size] = 5;
 			parameter[(int)parameterName.Morphology_Iteration_Number] = 3;
 			parameter[(int)parameterName.Display_Center] = 0;
@@ -211,17 +213,17 @@ namespace Core
 		{
 			int count = 0;
 			bool allCorrect = true;
-
 			polygonalModel_list.Clear();
 
-// 			foreach (string fileName in polygonalModel_fileName)
-// 			{
-// 				if (!Add_polygonalModel(fileName))
-// 				{
-// 					return false;
-// 				}
-// 				bw.ReportProgress(++count);
-// 			}
+
+//			foreach (string fileName in polygonalModel_fileName)
+//			{
+//				if (!Add_polygonalModel(fileName))
+//				{
+//					return false;
+//				}
+//				bw.ReportProgress(++count);
+//			}
 
 			objClass[] polygonModelArray = new objClass[polygonalModel_fileName.Count];
 
@@ -387,10 +389,19 @@ namespace Core
 		/// </summary>
 		/// <param name="bw"></param>
 		/// <returns></returns>
-		public bool Generate_feature_withProgress(BackgroundWorker bw, DoWorkEventArgs e)
+		public bool Generate_feature_withProgress(BackgroundWorker bw, DoWorkEventArgs e, bool isGPUAcceleration)
 		{
 			int count = 0;
 			bool allCorrect = true;
+
+			if (isGPUAcceleration)
+			{
+				coreClass.Cudafy_initialization();
+			}
+			else
+			{
+				coreClass.cudaReady = false;
+			}
 
 			if (!pointCloud.GenerateFeature())
 			{
@@ -408,16 +419,18 @@ namespace Core
 				bw.ReportProgress(++count);
 			}
 
-// 			Parallel.ForEach(polygonalModel_list, (model, state) =>
-// 			{
-// 				if (!model.GenerateFeature() || bw.CancellationPending != false)
-// 				{
-// 					allCorrect = false;
-// 					e.Cancel = true;
-// 					state.Stop();
-// 				}
-// 				bw.ReportProgress(++count);
-// 			});
+//			ParallelOptions options = new ParallelOptions();
+//			options.MaxDegreeOfParallelism = 8;
+//			Parallel.ForEach(polygonalModel_list, (model, state) =>
+//			{
+//				if (!model.GenerateFeature() || bw.CancellationPending != false)
+//				{
+//					allCorrect = false;
+//					e.Cancel = true;
+//					state.Stop();
+//				}
+//				bw.ReportProgress(++count);
+//			});
 
 			return allCorrect;
 		}
@@ -568,7 +581,6 @@ namespace Core
 			}
 		}
 
-
 		/// <summary>
 		/// retrieve and rank
 		/// </summary>
@@ -582,8 +594,8 @@ namespace Core
 			{
 				if (usedFeature[i])
 				{
-					double sum = Enumerable.Range(0, coreClass.annularNum).Select(a => pointCloud.annularFeature[i, a]).Sum();
-					
+					double sum = Enumerable.Range(0, coreClass.annularNum).AsParallel().Select(a => pointCloud.annularFeature[i, a]).Sum();
+
 					for (int j = 0; j < coreClass.annularNum; j++)
 					{
 						if (sum != 0)
@@ -605,7 +617,7 @@ namespace Core
 				{
 					if (usedFeature[i])
 					{
-						double sum = Enumerable.Range(0, coreClass.annularNum).Select(a => model.annularFeature[i, a]).Sum();
+						double sum = Enumerable.Range(0, coreClass.annularNum).AsParallel().Select(a => model.annularFeature[i, a]).Sum();
 
 						for (int j = 0; j < coreClass.annularNum; j++)
 						{
@@ -628,14 +640,15 @@ namespace Core
 				double distSum = 0.0;
 				for (int j = 0; j < coreClass.featureDimension; j++)
 				{
-					distSum += Enumerable.Range(0, coreClass.annularNum).Select(a => Math.Abs(pointCloud_annulerFeature[j, a] - annulerFeatrue_list[i][j, a])).Sum() * featureWeight[j];
+					distSum += Enumerable.Range(0, coreClass.annularNum).AsParallel().Select(a => Math.Abs(pointCloud_annulerFeature[j, a] - annulerFeatrue_list[i][j, a])).Sum() * featureWeight[j];
 				}
 				rankingDistance[i] = distSum;
+				//rankingDistance[i] = 1;
 
 				//weight
 				if (sizeWeight)
 				{
-					double heightWeight = Math.Abs((polygonalModel_list[i].zRange - pointCloud.zRange) / pointCloud.zRange) + 1; 
+					double heightWeight = Math.Abs((polygonalModel_list[i].zRange - pointCloud.zRange) / pointCloud.zRange) + 1;
 					double radiusWeight = Math.Abs((polygonalModel_list[i].radiusMax - pointCloud.radiusMax) / pointCloud.radiusMax) + 1;
 					double areaWeight = Math.Abs((polygonalModel_list[i].totalArea - pointCloud.totalArea) / pointCloud.totalArea) + 1;
 
@@ -643,7 +656,7 @@ namespace Core
 				}
 			}
 
-			rankingIndex = rankingDistance.Select((value, index) => new { value, index }).OrderBy(a => a.value).Select(a => a.index).ToArray();
+			rankingIndex = rankingDistance.Select((value, index) => new { value, index }).AsParallel().OrderBy(a => a.value).Select(a => a.index).ToArray();
 		}
 	}
 }

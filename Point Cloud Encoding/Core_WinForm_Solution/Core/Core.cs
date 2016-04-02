@@ -17,6 +17,10 @@ data2D：
 2 => eigen feature A
 3 => eigen feature P
 4 => eigen feature S
+
+CPU加速：
+在執行物件方法前，先呼叫CUDA的初始化函式
+coreClass.Cudafy_initialization();
 */
 
 using System;
@@ -35,7 +39,12 @@ using ImageTool;
 using Emgu.CV;
 using Emgu.CV.Structure;
 
-using MathNet.Numerics.LinearAlgebra;
+using MN = MathNet.Numerics;
+using MNL = MathNet.Numerics.LinearAlgebra;
+
+using Cudafy;
+using Cudafy.Host;
+using Cudafy.Translator;
 
 namespace Core
 {
@@ -44,7 +53,7 @@ namespace Core
 	{
 		public string fileName { get; private set; }
 		public double eigenFeatureDiameter { get; private set; }
-		
+
 
 		public double[,,] data2D { get; protected set; }
 		public bool[,] data2DMask { get; protected set; }
@@ -85,6 +94,13 @@ namespace Core
 		public static bool ifDisplayCenter;
 		public static int borderAdditionWidth;
 		public static int thumbnailImgMaxSize;
+
+		public static GPGPU gpu { get; private set; }
+		public static CudafyModule km { get; private set; }
+		public static bool cudaReady = false;
+		public const int threadMaxNum = 32;
+		//public static Queue<byte> cudaStreamQueue { get; private set; }
+
 
 
 		public coreClass(string fileName)
@@ -173,12 +189,12 @@ namespace Core
 
 		private void CalArea()
 		{
-			totalArea = Enumerable.Range(0, width * height).Where(i => data2DMask[i % width, i / width] == true).Count() * Math.Pow(gridSize, 2);
+			totalArea = Enumerable.Range(0, width * height).AsParallel().Where(i => data2DMask[i % width, i / width] == true).Count() * Math.Pow(gridSize, 2);
 		}
 
 		private void CalVol()
 		{
-			totalVol = Enumerable.Range(0, width * height).Where(i => data2DMask[i % width, i / width] == true).Select(i => data2D[i % width, i / width, (byte)feature.Height]).Sum();
+			totalVol = Enumerable.Range(0, width * height).AsParallel().Where(i => data2DMask[i % width, i / width] == true).Select(i => data2D[i % width, i / width, (byte)feature.Height]).Sum();
 		}
 
 		private void Cal2DFeature()
@@ -200,13 +216,15 @@ namespace Core
 				//Loplacian of Gaussian (LoG)
 				Image<Gray, float> emguLoGImg = emguImg.SmoothGaussian(gaussianAperture).Laplace(laplacianAperture);
 
-				for (int i = 0; i < width; i++)
+				Parallel.For(0, width - 1, i=>
+				//for (int i = 0; i < width; i++)
 				{
 					for (int j = 0; j < height; j++)
 					{
 						data2D[i, j, 1] = Math.Abs(emguLoGImg.Data[j, i, (byte)feature.Height]);
 					}
 				}
+				);
 			}
 
 
@@ -218,7 +236,8 @@ namespace Core
 			}
 			else
 			{
-				for (int i = 0; i < width; i++)
+				Parallel.For(0, width - 1, i =>
+				//for (int i = 0; i < width; i++)
 				{
 					for (int j = 0; j < height; j++)
 					{
@@ -227,115 +246,229 @@ namespace Core
 						data2D[i, j, (byte)feature.Sphericity] = 0.0;
 					}
 				}
+				);
 				return;
 			}
-			//List<double[]> neighborList = new List<double[]>();
-			//List<List<double[]>> tt = new List<List<double[]>>();
-			//List<Vector<Complex>> ttp = new List<Vector<Complex>>();
-			//for (int i = 0; i < width; i++)
-			Parallel.For(0, width - 1, i =>
+
+
+
+			//if (!cudaReady)
+			//	Cudafy_initialization();
+
+
+			if (cudaReady)
 			{
-				for (int j = 0; j < height; j++)
+				double[,,] data2DHeight = new double[width, height, 1];
+				byte[,] data2DMask = new byte[width, height];
+				double[,,] eigenFeature = new double[width, height, 3];
+
+				Parallel.For(0, width - 1, i =>
+				//for (int i = 0; i < width; i++)
 				{
-					if (data2DMask[i, j])
+					for (int j = 0; j < height; j++)
 					{
-						if (i < eigenFeatureDiameterMultiple || i > width - 1 - eigenFeatureDiameterMultiple || j < eigenFeatureDiameterMultiple || j > height - 1 - eigenFeatureDiameterMultiple)
-						{
+						data2DHeight[i, j, 0] = data2D[i, j, (byte)feature.Height];
 
-						}
+						if (this.data2DMask[i, j])
+							data2DMask[i, j] = 1;
 						else
+							data2DMask[i, j] = 0;
+					}
+				}
+				);
+
+
+				int streamid = 0;
+				//gpu.CreateStream(streamid);
+
+
+				//int threadMaxNum = 1;
+
+				dim3 gridDim = new dim3(((width * height) / threadMaxNum) + 1, 1, 1);
+				dim3 blockDim = new dim3(threadMaxNum, 1, 1);
+
+				//dim3 gridDim = new dim3(width, height, 1);
+				//dim3 blockDim = new dim3(1, 1, 1);
+
+				
+				IntPtr ptr_imgData = gpu.HostAllocate<double>(width, height, 1);
+				IntPtr ptr_data2DMask = gpu.HostAllocate<bool>(width, height);
+				IntPtr ptr_eigenFeature = gpu.HostAllocate<double>(width, height, 3);
+
+				ptr_imgData.Write<double>(data2DHeight);
+				ptr_data2DMask.Write<byte>(data2DMask);
+
+				double[,,] dev_imgData = gpu.Allocate<double>(width, height, 1);
+				byte[,] dev_data2DMask = gpu.Allocate<byte>(width, height);
+				double[,,] dev_eigenFeature = gpu.Allocate<double>(width, height, 3);
+
+				gpu.CopyToDeviceAsync<double>(ptr_imgData, 0, dev_imgData, 0, width * height, streamid);
+				gpu.CopyToDeviceAsync<byte>(ptr_data2DMask, 0, dev_data2DMask, 0, width * height, streamid);
+				gpu.LaunchAsync(gridDim, blockDim, streamid, "GenerateEigenFeature", eigenFeatureDiameterMultiple, (float)gridSize, dev_imgData, dev_data2DMask, dev_eigenFeature);
+				gpu.CopyFromDeviceAsync<double>(dev_eigenFeature, 0, ptr_eigenFeature, 0, width * height * 3, streamid);
+
+				gpu.SynchronizeStream(streamid);
+				//gpu.DestroyStream(streamid);
+
+				ptr_eigenFeature.Read<double>(eigenFeature);
+
+
+				gpu.HostFree(ptr_imgData);
+				gpu.HostFree(ptr_data2DMask);
+				gpu.HostFree(ptr_eigenFeature);
+				gpu.Free(dev_imgData);
+				gpu.Free(dev_data2DMask);
+				gpu.Free(dev_eigenFeature);
+
+
+				Parallel.For(0, width - 1, i =>
+				//for (int i = 0; i < width; i++)
+				{
+					for (int j = 0; j < height; j++)
+					{
+						data2D[i, j, (byte)feature.Linearity] = eigenFeature[i, j, 0];
+						data2D[i, j, (byte)feature.Planarity] = eigenFeature[i, j, 1];
+						data2D[i, j, (byte)feature.Sphericity] = eigenFeature[i, j, 2];
+					}
+				}
+				);
+			}
+			else
+			{
+				//MN.Control.UseNativeCUDA();
+				MN.Control.UseManaged();
+				//CudaLinearAlgebraProvider cu = new CudaLinearAlgebraProvider();
+
+
+
+				Parallel.For(0, width - 1, i =>
+				//for (int i = 0; i < width; i++)
+				{
+					for (int j = 0; j < height; j++)
+					{
+						if (this.data2DMask[i, j])
 						{
-							List<double[]> neighborList = new List<double[]>();
-							//neighborList.Clear();
-
-							for (int k = i - eigenFeatureDiameterMultiple; k <= i + eigenFeatureDiameterMultiple; k++)
+							if (i < eigenFeatureDiameterMultiple || i > width - 1 - eigenFeatureDiameterMultiple || j < eigenFeatureDiameterMultiple || j > height - 1 - eigenFeatureDiameterMultiple)
 							{
-								for (int l = j - eigenFeatureDiameterMultiple; l <= j + eigenFeatureDiameterMultiple; l++)
-								{
-									if (data2DMask[k, l] && Math.Sqrt(Math.Pow((k - i) * gridSize, 2) + Math.Pow((l - j) * gridSize, 2) + Math.Pow(data2D[i, j, (byte)feature.Height] - data2D[k, l, (byte)feature.Height], 2)) < eigenFeatureDiameter)
-									{
-										neighborList.Add(new double[3] { k * gridSize, l * gridSize, data2D[k, l, (byte)feature.Height]});
-									}
-								}
-							}
-
-							if (neighborList.Count < 2)
-							{
-								data2D[i, j, (byte)feature.Linearity] = 0;
-								data2D[i, j, (byte)feature.Planarity] = 0;
-								data2D[i, j, (byte)feature.Sphericity] = 0;
+								break;
 							}
 							else
 							{
-								double[] mean = new double[3] { neighborList.Select(a => a[0]).Average(), neighborList.Select(a => a[1]).Average(), neighborList.Select(a => a[2]).Average() };
+								int neighborCount = 0;
+								bool[,] isNeighbor = new bool[2 * eigenFeatureDiameterMultiple + 1, 2 * eigenFeatureDiameterMultiple + 1];
 
-								foreach (double[] pc in neighborList)
+								for (int k = 0; k < isNeighbor.GetLength(0); k++)
 								{
-									pc[0] -= mean[0];
-									pc[1] -= mean[1];
-									pc[2] -= mean[2];
+									for (int l = 0; l < isNeighbor.GetLength(1); l++)
+									{
+										isNeighbor[k, l] = false;
+									}
 								}
 
-								MathNet.Numerics.LinearAlgebra.Matrix<double> matrixP = MathNet.Numerics.LinearAlgebra.Matrix<double>.Build.DenseOfColumnArrays(neighborList.ToArray());
+								double xSum = 0;
+								double ySum = 0;
+								double zSum = 0;
 
-								//MathNet.Numerics.LinearAlgebra.Matrix<double> matrixCovariance = MathNet.Numerics.LinearAlgebra.Matrix<double>.Build.DenseOfColumnArrays(neighborList.ToArray());
-								//matrixCovariance = matrixCovariance * matrixCovariance.Transpose() / neighborList.Count;
 
-								MathNet.Numerics.LinearAlgebra.Matrix<double> matrixCovariance = MathNet.Numerics.LinearAlgebra.Matrix<double>.Build.Dense(3, 3, 0.0);
-
-								for (int n = 0; n < neighborList.Count; n++)
+								for (int k = i - eigenFeatureDiameterMultiple; k <= i + eigenFeatureDiameterMultiple; k++)
 								{
-									matrixCovariance += matrixP.SubMatrix(0, 3, n, 1) * matrixP.SubMatrix(0, 3, n, 1).Transpose();
+									for (int l = j - eigenFeatureDiameterMultiple; l <= j + eigenFeatureDiameterMultiple; l++)
+									{
+										if (this.data2DMask[k, l] && Math.Sqrt(Math.Pow((k - i) * gridSize, 2) + Math.Pow((l - j) * gridSize, 2) + Math.Pow(data2D[i, j, (byte)feature.Height] - data2D[k, l, (byte)feature.Height], 2)) < eigenFeatureDiameter)
+										{
+											isNeighbor[k - (i - eigenFeatureDiameterMultiple), l - (j - eigenFeatureDiameterMultiple)] = true;
+
+											xSum += k * gridSize;
+											ySum += l * gridSize;
+											zSum += data2D[k, l, 0];
+
+											neighborCount++;
+										}
+									}
 								}
 
-								MathNet.Numerics.LinearAlgebra.Matrix<double> matrixTT = matrixCovariance;
-
-
-								matrixCovariance = matrixCovariance.Divide(neighborList.Count);
-
-								var eigenResult = matrixCovariance.Evd();
-
-								Vector<Complex> eigenValues = eigenResult.EigenValues;
-
-								/*
-								if (eigenValues[0].Real < 0 || eigenValues[1].Real < 0 || eigenValues[2].Real < 0)
+								if (neighborCount < 2)
 								{
-									tt.Add(neighborList);
-									ttp.Add(eigenValues);
-								}
-								*/
-
-								double Linearity = (eigenValues[2].Magnitude - eigenValues[1].Magnitude) / eigenValues[2].Magnitude;
-								double Planarity = (eigenValues[1].Magnitude - eigenValues[0].Magnitude) / eigenValues[2].Magnitude;
-								double Sphericity = eigenValues[0].Magnitude / eigenValues[2].Magnitude;
-
-								if (!double.IsNaN(Linearity))
-									data2D[i, j, (byte)feature.Linearity] = Linearity;
-								else
 									data2D[i, j, (byte)feature.Linearity] = 0;
-
-								if (!double.IsNaN(Planarity))
-									data2D[i, j, (byte)feature.Planarity] = Planarity;
-								else
 									data2D[i, j, (byte)feature.Planarity] = 0;
-
-								if (!double.IsNaN(Sphericity))
-									data2D[i, j, (byte)feature.Sphericity] = Sphericity;
-								else
 									data2D[i, j, (byte)feature.Sphericity] = 0;
-							}
+								}
+								else
+								{
+									double[] mean = new double[3] { xSum / neighborCount, ySum / neighborCount, zSum / neighborCount};
+									MNL.Matrix<double> eigenMatrix = MNL.Matrix<double>.Build.Dense(3, 3, 0.0);
 
+									for (int k = i - eigenFeatureDiameterMultiple; k <= i + eigenFeatureDiameterMultiple; k++)
+									{
+										for (int l = j - eigenFeatureDiameterMultiple; l <= j + eigenFeatureDiameterMultiple; l++)
+										{
+											if (isNeighbor[k - (i - eigenFeatureDiameterMultiple), l - (j - eigenFeatureDiameterMultiple)])
+											{
+												double x = k * gridSize - mean[0];
+												double y = l * gridSize - mean[1];
+												double z = data2D[k, l, 0] - mean[2];
+
+												eigenMatrix[0, 0] += x * x;
+												eigenMatrix[0, 1] += x * y;
+												eigenMatrix[0, 2] += x * z;
+												eigenMatrix[1, 0] += y * x;
+												eigenMatrix[1, 1] += y * y;
+												eigenMatrix[1, 2] += y * z;
+												eigenMatrix[2, 0] += z * x;
+												eigenMatrix[2, 1] += z * y;
+												eigenMatrix[2, 2] += z * z;
+											}
+										}
+									}
+
+									eigenMatrix /= neighborCount;
+									var eigenResult = eigenMatrix.Evd();
+									MNL.Vector<Complex> eigenValues = eigenResult.EigenValues;
+
+
+									double eigenValues1 = eigenValues[2].Magnitude;
+									double eigenValues2 = eigenValues[1].Magnitude;
+									double eigenValues3 = eigenValues[0].Magnitude;
+
+
+									if (eigenValues1 < 0)
+										eigenValues1 = 0;
+									if (eigenValues2 < 0)
+										eigenValues2 = 0;
+									if (eigenValues3 < 0)
+										eigenValues3 = 0;
+
+
+									double Linearity = 0;
+									double Planarity = 0;
+									double Sphericity = 0;
+
+
+									if (eigenValues1 > 0)
+									{
+										Linearity = (eigenValues1 - eigenValues2) / eigenValues1;
+										Planarity = (eigenValues2 - eigenValues3) / eigenValues1;
+										Sphericity = eigenValues3 / eigenValues1;
+									}
+
+
+									data2D[i, j, (byte)feature.Linearity] = Linearity;
+									data2D[i, j, (byte)feature.Planarity] = Planarity;
+									data2D[i, j, (byte)feature.Sphericity] = Sphericity;
+								}
+
+							}
 						}
 					}
 				}
-			}
-			);
+				);
 
+			}
 		}
 
 		private void CalAnnularFeature()
 		{
-			radiusMax = Enumerable.Range(0, width * height).Where(i => data2DMask[i % width, i / width] == true).Select(i => Math.Sqrt(Math.Pow((i % width) - xAvg, 2) + Math.Pow((i / width) - yAvg, 2))).Max() * gridSize;
+			radiusMax = Enumerable.Range(0, width * height).AsParallel().Where(i => data2DMask[i % width, i / width] == true).Select(i => Math.Sqrt(Math.Pow((i % width) - xAvg, 2) + Math.Pow((i / width) - yAvg, 2))).Max() * gridSize;
 
 			double annularRangeDistance = radiusMax / (double)annularNum;
 
@@ -358,7 +491,8 @@ namespace Core
 
 			double[,] data2DDistance = new double[width, height];
 
-			for (int i = 0; i < width; i++)
+			Parallel.For(0, width - 1, i =>
+			//for (int i = 0; i < width; i++)
 			{
 				for (int j = 0; j < height; j++)
 				{
@@ -403,17 +537,19 @@ namespace Core
 					}
 				}
 			}
+			);
 
 			//apply annular weight
-			for (int i = 0; i < coreClass.featureDimension; i++)
+			Parallel.For(0, coreClass.featureDimension - 1, i =>
+			//for (int i = 0; i < coreClass.featureDimension; i++)
 			{
 				for (int j = 1; j <= coreClass.annularNum; j++)
 				{
 					annularFeature[i, j - 1] /= ((j + (j - 1)) * (j - (j - 1)));
 				}
 			}
+			);
 		}
-
 
 		protected void CalAvg()
 		{
@@ -429,10 +565,10 @@ namespace Core
 			}
 
 			//計算中心點(z因為要算中心而不是表面，所以要除以2)
-			double zSum = Enumerable.Range(0, width * height).Select(i => data2D[i % width, i / width, (byte)feature.Height]).Sum();
-			xAvg = (int)Math.Round(Enumerable.Range(0, width * height).Select(i => data2DAvg[i % width, i / width, 0]).Sum() / zSum) - 1;
-			yAvg = (int)Math.Round(Enumerable.Range(0, width * height).Select(i => data2DAvg[i % width, i / width, 1]).Sum() / zSum) - 1;
-			zAvg = (Enumerable.Range(0, width * height).Select(i => data2D[i % width, i / width, (byte)feature.Height]).Sum() / 2) / Enumerable.Range(0, width * height).Where(i => data2DMask[i % width, i / width] == true).Count();
+			double zSum = Enumerable.Range(0, width * height).AsParallel().Select(i => data2D[i % width, i / width, (byte)feature.Height]).Sum();
+			xAvg = (int)Math.Round(Enumerable.Range(0, width * height).AsParallel().Select(i => data2DAvg[i % width, i / width, 0]).Sum() / zSum) - 1;
+			yAvg = (int)Math.Round(Enumerable.Range(0, width * height).AsParallel().Select(i => data2DAvg[i % width, i / width, 1]).Sum() / zSum) - 1;
+			zAvg = (Enumerable.Range(0, width * height).AsParallel().Select(i => data2D[i % width, i / width, (byte)feature.Height]).Sum() / 2) / Enumerable.Range(0, width * height).Where(i => data2DMask[i % width, i / width] == true).Count();
 		}
 
 		protected void DisplayCenter()
@@ -442,6 +578,878 @@ namespace Core
 				for (int j = yAvg - 1; j <= yAvg + 1; j++)
 				{
 					data2D[i, j, (byte)feature.Height] = zMinAdj;
+				}
+			}
+		}
+
+		public static void Cudafy_initialization()
+		{
+			try
+			{
+				km = CudafyTranslator.Cudafy(ePlatform.x64, eArchitecture.sm_50);
+				//km = CudafyTranslator.Cudafy(ePlatform.x64, eArchitecture.sm_30);
+
+				km.GenerateDebug = true;
+
+				CudafyModes.Target = eGPUType.Cuda;
+				CudafyModes.DeviceId = 0;
+
+				gpu = CudafyHost.GetDevice(CudafyModes.Target, CudafyModes.DeviceId);
+
+				gpu.UnloadModules();
+				gpu.FreeAll();
+
+				gpu.LoadModule(km);
+
+				cudaReady = true;				
+			}
+			catch (Exception)
+			{ 
+				cudaReady = false;
+				return;
+			}
+		}
+
+		//		[Cudafy1]
+		//		public static void GenerateEigenFeature(GThread thread, double[,,] data2D, byte[,] data2DMask, double[,,] eigenFeature)
+		//		{
+		//			int i = (int)Math.Floor((double)(thread.blockIdx.x * thread.blockDim.x + thread.threadIdx.x) / data2D.GetLength(1));
+		//			int j = (thread.blockIdx.x * thread.blockDim.x + thread.threadIdx.x) % data2D.GetLength(1);
+		//			int t = thread.threadIdx.x;
+		//
+		//			int width = data2D.GetLength(0);
+		//			int height = data2D.GetLength(1);
+		//
+		//
+		//			int eigenFeatureDiameterMultiple = 5;
+		//			double gridSize = 0.1;
+		//			double eigenFeatureDiameter = gridSize * eigenFeatureDiameterMultiple;
+		//
+		//
+		//			if (data2DMask[i, j] == 1)
+		//			{
+		//				if (i < eigenFeatureDiameterMultiple || i > width - 1 - eigenFeatureDiameterMultiple || j < eigenFeatureDiameterMultiple || j > height - 1 - eigenFeatureDiameterMultiple)
+		//				{
+		//					eigenFeature[i, j, 0] = 0;
+		//					eigenFeature[i, j, 1] = 0;
+		//					eigenFeature[i, j, 2] = 0;
+		//				}
+		//				else
+		//				{
+		//					int indexCount = 0;
+		//					int neighborCount = 0;
+		//
+		//
+		//					double[,,] neighborList = thread.AllocateShared<double>("neighborList", threadMaxNum, 121, 3);
+		//
+		//					for (int k = i - eigenFeatureDiameterMultiple; k <= i + eigenFeatureDiameterMultiple; k++)
+		//					{
+		//						for (int l = j - eigenFeatureDiameterMultiple; l <= j + eigenFeatureDiameterMultiple; l++)
+		//						{
+		//							if (data2DMask[k, l] == 1)
+		//							{
+		//								double xDis = Math.Pow((k - i) * gridSize, 2);
+		//								double yDis = Math.Pow((l - j) * gridSize, 2);
+		//								double zDis = Math.Pow(data2D[i, j, 0] - data2D[k, l, 0], 2);
+		//								double totalDis = Math.Sqrt(xDis + yDis + zDis);
+		//
+		//								if (totalDis < eigenFeatureDiameter)
+		//								{
+		//									neighborList[t, indexCount, 0] = k * gridSize;
+		//									neighborList[t, indexCount, 1] = l * gridSize;
+		//									neighborList[t, indexCount, 2] = data2D[k, l, 0];
+		//
+		//									neighborCount++;
+		//								}
+		//								else
+		//								{
+		//									neighborList[t, indexCount, 0] = 0.0;
+		//									neighborList[t, indexCount, 1] = 0.0;
+		//									neighborList[t, indexCount, 2] = 0.0;
+		//								}
+		//							}
+		//							else
+		//							{
+		//								neighborList[t, indexCount, 0] = 0.0;
+		//								neighborList[t, indexCount, 1] = 0.0;
+		//								neighborList[t, indexCount, 2] = 0.0;
+		//							}
+		//							indexCount++;
+		//						}
+		//					}
+		//
+		//
+		//
+		//					if (neighborCount < 2)
+		//					{
+		//						eigenFeature[i, j, 0] = 0;
+		//						eigenFeature[i, j, 1] = 0;
+		//						eigenFeature[i, j, 2] = 0;
+		//					}
+		//					else
+		//					{
+		//						double xSum = 0.0;
+		//						double ySum = 0.0;
+		//						double zSum = 0.0;
+		//
+		//						for (int k = 0; k < indexCount; k++)
+		//						{
+		//							xSum += neighborList[t, k, 0];
+		//							ySum += neighborList[t, k, 1];
+		//							zSum += neighborList[t, k, 2];
+		//						}
+		//
+		//						double xAverage = xSum / neighborCount;
+		//						double yAverage = ySum / neighborCount;
+		//						double zAverage = zSum / neighborCount;
+		//
+		//
+		//						for (int k = 0; k < indexCount; k++)
+		//						{
+		//							if (neighborList[t, k, 0] != 0 && neighborList[t, k, 1] != 0 && neighborList[t, k, 2] != 0)
+		//							{
+		//								neighborList[t, k, 0] -= xAverage;
+		//								neighborList[t, k, 1] -= yAverage;
+		//								neighborList[t, k, 2] -= zAverage;
+		//							}
+		//						}
+		//
+		//
+		//
+		//						double[,,] eigenMatrix = thread.AllocateShared<double>("eigenMatrix", threadMaxNum, 3, 3);
+		//
+		//						for (int k = 0; k < 3; k++)
+		//						{
+		//							for (int l = 0; l < 3; l++)
+		//							{
+		//								eigenMatrix[t, k, l] = 0.0f;
+		//								for (int m = 0; m < indexCount; m++)
+		//								{
+		//									eigenMatrix[t, k, l] += neighborList[t, m, k] * neighborList[t, m, l];
+		//								}
+		//								eigenMatrix[t, k, l] /= neighborCount;
+		//							}
+		//						}
+		//
+		//
+		//
+		//						double[,] eigenValues = thread.AllocateShared<double>("eigenValue", threadMaxNum, 3);
+		//
+		//						double p1 = Math.Pow(eigenMatrix[t, 0, 1], 2) + Math.Pow(eigenMatrix[t, 0, 2], 2) + Math.Pow(eigenMatrix[t, 1, 2], 2);
+		//						if (p1 == 0)
+		//						{
+		//							double[] v = thread.AllocateShared<double>("v", 3);
+		//
+		//							v[0] = eigenMatrix[t, 0, 0];
+		//							v[1] = eigenMatrix[t, 1, 1];
+		//							v[2] = eigenMatrix[t, 2, 2];
+		//
+		//							if (v[0] >= v[1] && v[0] >= v[2])
+		//							{
+		//								eigenValues[t, 0] = v[0];
+		//
+		//								if (v[1] >= v[2])
+		//								{
+		//									eigenValues[t, 1] = v[1];
+		//									eigenValues[t, 2] = v[2];
+		//								}
+		//								else
+		//								{
+		//									eigenValues[t, 1] = v[2];
+		//									eigenValues[t, 2] = v[1];
+		//								}
+		//							}
+		//							else if (v[1] >= v[0] && v[1] >= v[2])
+		//							{
+		//								eigenValues[t, 0] = v[1];
+		//
+		//								if (v[0] >= v[2])
+		//								{
+		//									eigenValues[t, 1] = v[0];
+		//									eigenValues[t, 2] = v[2];
+		//								}
+		//								else
+		//								{
+		//									eigenValues[t, 1] = v[2];
+		//									eigenValues[t, 2] = v[0];
+		//								}
+		//							}
+		//							else if (v[2] >= v[0] && v[2] >= v[1])
+		//							{
+		//								eigenValues[t, 0] = v[2];
+		//
+		//								if (v[0] >= v[1])
+		//								{
+		//									eigenValues[t, 1] = v[0];
+		//									eigenValues[t, 2] = v[1];
+		//								}
+		//								else
+		//								{
+		//									eigenValues[t, 1] = v[1];
+		//									eigenValues[t, 2] = v[0];
+		//								}
+		//							}
+		//						}
+		//						else
+		//						{
+		//							double q = (eigenMatrix[t, 0, 0] + eigenMatrix[t, 1, 1] + eigenMatrix[t, 2, 2]) / 3;
+		//							double p2 = Math.Pow(eigenMatrix[t, 0, 0] - q, 2) + Math.Pow(eigenMatrix[t, 1, 1] - q, 2) + Math.Pow(eigenMatrix[t, 2, 2] - q, 2) + 2 * p1;
+		//							double p = Math.Sqrt(p2 / 6);
+		//
+		//							double[,,] B = thread.AllocateShared<double>("B", threadMaxNum, 3, 3);
+		//
+		//							for (int k = 0; k < 3; k++)
+		//							{
+		//								for (int l = 0; l < 3; l++)
+		//								{
+		//									float I = 0.0f;
+		//									if (k == l)
+		//										I = 1;
+		//									B[t, k, l] = (1 / p) * (eigenMatrix[t, k, l] - q * I);
+		//								}
+		//							}
+		//
+		//							double r = (B[t, 0, 0] * B[t, 1, 1] * B[t, 2, 2] + B[t, 0, 1] * B[t, 1, 2] * B[t, 2, 0] + B[t, 0, 2] * B[t, 1, 0] * B[t, 2, 1] - B[t, 0, 2] * B[t, 1, 1] * B[t, 2, 0] - B[t, 0, 0] * B[t, 1, 2] * B[t, 2, 1] - B[t, 0, 1] * B[t, 1, 0] * B[t, 2, 2]) / 2;
+		//
+		//							double phi;
+		//
+		//							if (r <= -1)
+		//								phi = Math.PI / 3;
+		//							else if (r >= 1)
+		//								phi = 0;
+		//							else
+		//								phi = Math.Acos(r) / 3;
+		//
+		//							eigenValues[t, 0] = q + 2 * p * Math.Cos(phi);
+		//							eigenValues[t, 2] = q + 2 * p * Math.Cos(phi + (2 * Math.PI / 3));
+		//							eigenValues[t, 1] = 3 * q - eigenValues[t, 0] - eigenValues[t, 2];
+		//						}
+		//
+		//
+		//						for (int k = 0; k < 3; k++)
+		//						{
+		//							if (eigenValues[t, k] < 0)
+		//								eigenValues[t, k] = 0;
+		//						}
+		//
+		//
+		//						double Linearity = 0.0;
+		//						double Planarity = 0.0;
+		//						double Sphericity = 0.0;
+		//
+		//
+		//						if (eigenValues[t, 0] != 0)
+		//						{
+		//							Linearity = (eigenValues[t, 0] - eigenValues[t, 1]) / eigenValues[t, 0];
+		//							Planarity = (eigenValues[t, 1] - eigenValues[t, 2]) / eigenValues[t, 0];
+		//							Sphericity = eigenValues[t, 2] / eigenValues[t, 0];
+		//						}
+		//
+		//
+		//						eigenFeature[i, j, 0] = Linearity;
+		//						eigenFeature[i, j, 1] = Planarity;
+		//						eigenFeature[i, j, 2] = Sphericity;
+		//
+		//
+		//						/*
+		//						double Linearity = (eigenValues[0] - eigenValues[1]) / eigenValues[0];
+		//						double Planarity = (eigenValues[1] - eigenValues[2]) / eigenValues[0];
+		//						double Sphericity = eigenValues[2] / eigenValues[0];
+		//
+		//						if (!double.IsNaN(Linearity) && !double.IsInfinity(Linearity))
+		//							eigenFeature[i, j, 0] = Linearity;
+		//						else
+		//							eigenFeature[i, j, 0] = 0;
+		//
+		//						if (!double.IsNaN(Planarity) && !double.IsInfinity(Planarity))
+		//							eigenFeature[i, j, 1] = Planarity;
+		//						else
+		//							eigenFeature[i, j, 1] = 0;
+		//
+		//						if (!double.IsNaN(Sphericity) && !double.IsInfinity(Sphericity))
+		//							eigenFeature[i, j, 2] = Sphericity;
+		//						else
+		//							eigenFeature[i, j, 2] = 0;
+		//						*/
+		//
+		//
+		//						//eigenFeature[i, j, 0] = 1;
+		//						//eigenFeature[i, j, 1] = 1;
+		//						//eigenFeature[i, j, 2] = 1;
+		//					}
+		//				}
+		//			}
+		//			else
+		//			{
+		//				eigenFeature[i, j, 0] = 0;
+		//				eigenFeature[i, j, 1] = 0;
+		//				eigenFeature[i, j, 2] = 0;
+		//			}
+		//
+		//		}
+
+
+		//		[Cudafy2]
+		//		public static void GenerateEigenFeature(GThread thread, double[,,] data2D, byte[,] data2DMask, double[,,] eigenFeature)
+		//		{
+		//			int i = (int)GMath.Floor((thread.blockIdx.x * thread.blockDim.x + thread.threadIdx.x) / data2D.GetLength(1));
+		//			int j = (thread.blockIdx.x * thread.blockDim.x + thread.threadIdx.x) % data2D.GetLength(1);
+		//			int t = thread.threadIdx.x;
+		//
+		//			int width = data2D.GetLength(0);
+		//			int height = data2D.GetLength(1);
+		//
+		//			
+		//			int eigenFeatureDiameterMultiple = 4;
+		//			float gridSize = 0.1f;
+		//			float eigenFeatureDiameter = gridSize * eigenFeatureDiameterMultiple;
+		//
+		//
+		//			if (data2DMask[i, j] == 1)
+		//			{
+		//				if (i < eigenFeatureDiameterMultiple || i > width - 1 - eigenFeatureDiameterMultiple || j < eigenFeatureDiameterMultiple || j > height - 1 - eigenFeatureDiameterMultiple)
+		//				{
+		//					return;
+		//				}
+		//				else
+		//				{
+		//					int indexCount = 0;
+		//					int neighborCount = 0;
+		//
+		//
+		//					float[,,] neighborList = thread.AllocateShared<float>("neighborList", threadMaxNum, 81, 3);
+		//
+		//					for (int k = i - eigenFeatureDiameterMultiple; k <= i + eigenFeatureDiameterMultiple; k++)
+		//					{
+		//						for (int l = j - eigenFeatureDiameterMultiple; l <= j + eigenFeatureDiameterMultiple; l++)
+		//						{
+		//							if (data2DMask[k, l] == 1)
+		//							{
+		//								float xDis = GMath.Pow((k - i) * gridSize, 2);
+		//								float yDis = GMath.Pow((l - j) * gridSize, 2);
+		//								float zDis = GMath.Pow((float)(data2D[i, j, 0] - data2D[k, l, 0]), 2);
+		//								float totalDis = GMath.Sqrt(xDis + yDis + zDis);
+		//
+		//								if (totalDis < eigenFeatureDiameter)
+		//								{
+		//									neighborList[t, indexCount, 0] = k * gridSize;
+		//									neighborList[t, indexCount, 1] = l * gridSize;
+		//									neighborList[t, indexCount, 2] = (float)data2D[k, l, 0];
+		//
+		//									neighborCount++;
+		//								}
+		//								else
+		//								{
+		//									neighborList[t, indexCount, 0] = 0;
+		//									neighborList[t, indexCount, 1] = 0;
+		//									neighborList[t, indexCount, 2] = 0;
+		//								}
+		//							}
+		//							else
+		//							{
+		//								neighborList[t, indexCount, 0] = 0;
+		//								neighborList[t, indexCount, 1] = 0;
+		//								neighborList[t, indexCount, 2] = 0;
+		//							}
+		//							indexCount++;
+		//						}
+		//					}
+		//
+		//
+		//
+		//					if (neighborCount >= 2)
+		//					{
+		//						float xSum = 0;
+		//						float ySum = 0;
+		//						float zSum = 0;
+		//
+		//						for (int k = 0; k < indexCount; k++)
+		//						{
+		//							xSum += neighborList[t, k, 0];
+		//							ySum += neighborList[t, k, 1];
+		//							zSum += neighborList[t, k, 2];
+		//						}
+		//
+		//						float xAverage = xSum / neighborCount;
+		//						float yAverage = ySum / neighborCount;
+		//						float zAverage = zSum / neighborCount;
+		//
+		//
+		//						for (int k = 0; k < indexCount; k++)
+		//						{
+		//							if (neighborList[t, k, 0] != 0 && neighborList[t, k, 1] != 0 && neighborList[t, k, 2] != 0)
+		//							{
+		//								neighborList[t, k, 0] -= xAverage;
+		//								neighborList[t, k, 1] -= yAverage;
+		//								neighborList[t, k, 2] -= zAverage;
+		//							}
+		//						}
+		//
+		//
+		//
+		//						float[,,] eigenMatrix = thread.AllocateShared<float>("eigenMatrix", threadMaxNum, 3, 3);
+		//
+		//						for (int k = 0; k < 3; k++)
+		//						{
+		//							for (int l = 0; l < 3; l++)
+		//							{
+		//								eigenMatrix[t, k, l] = 0.0f;
+		//								for (int m = 0; m < indexCount; m++)
+		//								{
+		//									eigenMatrix[t, k, l] += neighborList[t, m, k] * neighborList[t, m, l];
+		//								}
+		//								eigenMatrix[t, k, l] /= neighborCount;
+		//							}
+		//						}
+		//
+		//
+		//
+		//						//float[,] eigenValues = thread.AllocateShared<float>("eigenValue", threadMaxNum, 3);
+		//						float eigenValues1 = 0;
+		//						float eigenValues2 = 0;
+		//						float eigenValues3 = 0;
+		//
+		//						float p1 = GMath.Pow(eigenMatrix[t, 0, 1], 2) + GMath.Pow(eigenMatrix[t, 0, 2], 2) + GMath.Pow(eigenMatrix[t, 1, 2], 2);
+		//						if (p1 == 0)
+		//						{
+		//							//float[] v = thread.AllocateShared<float>("v", 3);
+		//							float v1, v2, v3;
+		//
+		//							v1 = eigenMatrix[t, 0, 0];
+		//							v2 = eigenMatrix[t, 1, 1];
+		//							v3 = eigenMatrix[t, 2, 2];
+		//
+		//							if (v1 >= v2 && v1 >= v3)
+		//							{
+		//								eigenValues1 = v1;
+		//
+		//								if (v2 >= v3)
+		//								{
+		//									eigenValues2 = v2;
+		//									eigenValues3 = v3;
+		//								}
+		//								else
+		//								{
+		//									eigenValues2 = v3;
+		//									eigenValues3 = v2;
+		//								}
+		//							}
+		//							else if (v2 >= v1 && v2 >= v3)
+		//							{
+		//								eigenValues1 = v2;
+		//
+		//								if (v1 >= v3)
+		//								{
+		//									eigenValues2 = v1;
+		//									eigenValues3 = v3;
+		//								}
+		//								else
+		//								{
+		//									eigenValues2 = v3;
+		//									eigenValues3 = v1;
+		//								}
+		//							}
+		//							else if (v3 >= v1 && v3 >= v2)
+		//							{
+		//								eigenValues1 = v3;
+		//
+		//								if (v1 >= v2)
+		//								{
+		//									eigenValues2 = v1;
+		//									eigenValues3 = v2;
+		//								}
+		//								else
+		//								{
+		//									eigenValues2 = v2;
+		//									eigenValues3 = v1;
+		//								}
+		//							}
+		//						}
+		//						else
+		//						{
+		//							float q = (eigenMatrix[t, 0, 0] + eigenMatrix[t, 1, 1] + eigenMatrix[t, 2, 2]) / 3;
+		//							float p2 = GMath.Pow(eigenMatrix[t, 0, 0] - q, 2) + GMath.Pow(eigenMatrix[t, 1, 1] - q, 2) + GMath.Pow(eigenMatrix[t, 2, 2] - q, 2) + 2 * p1;
+		//							float p = GMath.Sqrt(p2 / 6);
+		//
+		//							//float[,] B = thread.AllocateShared<float>("B", 3, 3);
+		//							float B1, B2, B3, B4, B5, B6, B7, B8, B9;
+		//
+		//							/*
+		//							for (int k = 0; k < 3; k++)
+		//							{
+		//								for (int l = 0; l < 3; l++)
+		//								{
+		//									float I = 0.0f;
+		//									if (k == l)
+		//										I = 1;
+		//									B[k, l] = (1 / p) * (eigenMatrix[t, k, l] - q * I);
+		//								}
+		//							}
+		//							*/
+		//							
+		//							B1 = (1 / p) * (eigenMatrix[t, 0, 0] - q);
+		//							B2 = (1 / p) * (eigenMatrix[t, 0, 1]);
+		//							B3 = (1 / p) * (eigenMatrix[t, 0, 2]);
+		//							B4 = (1 / p) * (eigenMatrix[t, 1, 0]);
+		//							B5 = (1 / p) * (eigenMatrix[t, 1, 1] - q);
+		//							B6 = (1 / p) * (eigenMatrix[t, 1, 2]);
+		//							B7 = (1 / p) * (eigenMatrix[t, 2, 0]);
+		//							B8 = (1 / p) * (eigenMatrix[t, 2, 1]);
+		//							B9 = (1 / p) * (eigenMatrix[t, 2, 2] - q);
+		//
+		//							float r = (B1 * B5 * B9 + B2 * B6 * B7 + B3 * B4 * B8 - B3 * B5 * B7 - B1 * B6 * B8 - B2 * B4 * B9) / 2;
+		//
+		//							float phi;
+		//
+		//							if (r <= -1)
+		//								phi = GMath.PI / 3;
+		//							else if (r >= 1)
+		//								phi = 0;
+		//							else
+		//								phi = GMath.Acos(r) / 3;
+		//
+		//							eigenValues1 = q + 2 * p * GMath.Cos(phi);
+		//							eigenValues3 = q + 2 * p * GMath.Cos(phi + (2 * GMath.PI / 3));
+		//							eigenValues2 = 3 * q - eigenValues1 - eigenValues3;
+		//						}
+		//
+		//
+		//						//for (int k = 0; k < 3; k++)
+		//						//{
+		//						//	if (eigenValues[t, k] < 0)
+		//						//		eigenValues[t, k] = 0;
+		//						//}
+		//
+		//
+		//						/*
+		//						if (eigenValues1 < 0.0000001)
+		//							eigenValues1 = 0;
+		//						if (eigenValues2 < 0.0000001)
+		//							eigenValues2 = 0;
+		//						if (eigenValues3 < 0.0000001)
+		//							eigenValues3 = 0;
+		//						*/
+		//
+		//						/*
+		//						double Linearity = 0;
+		//						double Planarity = 0;
+		//						double Sphericity = 0;
+		//						
+		//						
+		//						if (eigenValues1 != 0)
+		//						{
+		//							Linearity = (eigenValues1 - eigenValues2) / eigenValues1;
+		//							Planarity = (eigenValues2 - eigenValues3) / eigenValues1;
+		//							Sphericity = eigenValues3 / eigenValues1;
+		//						}
+		//
+		//
+		//						eigenFeature[i, j, 0] = Linearity;
+		//						eigenFeature[i, j, 1] = Planarity;
+		//						eigenFeature[i, j, 2] = Sphericity;
+		//						*/
+		//
+		//						
+		//						double Linearity = (eigenValues1 - eigenValues2) / eigenValues1;
+		//						double Planarity = (eigenValues2 - eigenValues3) / eigenValues1;
+		//						double Sphericity = eigenValues3 / eigenValues1;
+		//						
+		//						if (!double.IsNaN(Linearity) && !double.IsInfinity(Linearity))
+		//							eigenFeature[i, j, 0] = Linearity;
+		//						else
+		//							eigenFeature[i, j, 0] = 0;
+		//
+		//						if (!double.IsNaN(Planarity) && !double.IsInfinity(Planarity))
+		//							eigenFeature[i, j, 1] = Planarity;
+		//						else
+		//							eigenFeature[i, j, 1] = 0;
+		//
+		//						if (!double.IsNaN(Sphericity) && !double.IsInfinity(Sphericity))
+		//							eigenFeature[i, j, 2] = Sphericity;
+		//						else
+		//							eigenFeature[i, j, 2] = 0;
+		//
+		//
+		//
+		//						//eigenFeature[i, j, 0] = xSum;
+		//						//eigenFeature[i, j, 1] = ySum;
+		//						//eigenFeature[i, j, 2] = zSum;
+		//					}
+		//				}
+		//			}
+		//		}
+
+
+		[Cudafy]
+		public static void GenerateEigenFeature(GThread thread, int eigenFeatureDiameterMultiple, float gridSize, double[,,] data2D, byte[,] data2DMask, double[,,] eigenFeature)
+		{
+			int i = (int)GMath.Floor((thread.blockIdx.x * thread.blockDim.x + thread.threadIdx.x) / data2D.GetLength(1));
+			int j = (thread.blockIdx.x * thread.blockDim.x + thread.threadIdx.x) % data2D.GetLength(1);
+			int t = thread.threadIdx.x;
+
+			int width = data2D.GetLength(0);
+			int height = data2D.GetLength(1);
+
+
+			//int eigenFeatureDiameterMultiple = 4;
+			//float gridSize = 0.1f;
+			float eigenFeatureDiameter = gridSize * eigenFeatureDiameterMultiple;
+
+
+			if (data2DMask[i, j] == 1)
+			{
+				if (i < eigenFeatureDiameterMultiple || i > width - 1 - eigenFeatureDiameterMultiple || j < eigenFeatureDiameterMultiple || j > height - 1 - eigenFeatureDiameterMultiple)
+				{
+					return;
+				}
+				else
+				{
+					int indexCount = 0;
+					int neighborCount = 0;
+
+					float xSum = 0;
+					float ySum = 0;
+					float zSum = 0;
+										
+
+
+					for (int k = i - eigenFeatureDiameterMultiple; k <= i + eigenFeatureDiameterMultiple; k++)
+					{
+						for (int l = j - eigenFeatureDiameterMultiple; l <= j + eigenFeatureDiameterMultiple; l++)
+						{
+							if (data2DMask[k, l] == 1)
+							{
+								float xDis = GMath.Pow((k - i) * gridSize, 2);
+								float yDis = GMath.Pow((l - j) * gridSize, 2);
+								float zDis = GMath.Pow((float)(data2D[i, j, 0] - data2D[k, l, 0]), 2);
+								float totalDis = GMath.Sqrt(xDis + yDis + zDis);
+
+								if (totalDis < eigenFeatureDiameter)
+								{
+									xSum += k * gridSize;
+									ySum += l * gridSize;
+									zSum += (float)data2D[k, l, 0];
+
+									neighborCount++;
+								}
+							}
+							indexCount++;
+						}
+					}
+
+
+
+					if (neighborCount >= 2)
+					{
+						float xAverage = xSum / neighborCount;
+						float yAverage = ySum / neighborCount;
+						float zAverage = zSum / neighborCount;
+
+						float eigenMatrix11 = 0;
+						float eigenMatrix12 = 0;
+						float eigenMatrix13 = 0;
+						float eigenMatrix21 = 0;
+						float eigenMatrix22 = 0;
+						float eigenMatrix23 = 0;
+						float eigenMatrix31 = 0;
+						float eigenMatrix32 = 0;
+						float eigenMatrix33 = 0;
+
+
+
+						for (int k = i - eigenFeatureDiameterMultiple; k <= i + eigenFeatureDiameterMultiple; k++)
+						{
+							for (int l = j - eigenFeatureDiameterMultiple; l <= j + eigenFeatureDiameterMultiple; l++)
+							{
+								if (data2DMask[k, l] == 1)
+								{
+									float xDis = GMath.Pow((k - i) * gridSize, 2);
+									float yDis = GMath.Pow((l - j) * gridSize, 2);
+									float zDis = GMath.Pow((float)(data2D[i, j, 0] - data2D[k, l, 0]), 2);
+									float totalDis = GMath.Sqrt(xDis + yDis + zDis);
+
+									if (totalDis < eigenFeatureDiameter)
+									{
+										float x = k * gridSize - xAverage;
+										float y = l * gridSize - yAverage;
+										float z = (float)data2D[k, l, 0] - zAverage;
+
+										eigenMatrix11 += x * x;
+										eigenMatrix12 += x * y;
+										eigenMatrix13 += x * z;
+										eigenMatrix21 += y * x;
+										eigenMatrix22 += y * y;
+										eigenMatrix23 += y * z;
+										eigenMatrix31 += z * x;
+										eigenMatrix32 += z * y;
+										eigenMatrix33 += z * z;
+									}
+								}
+							}
+						}
+
+
+
+						eigenMatrix11 /= neighborCount;
+						eigenMatrix12 /= neighborCount;
+						eigenMatrix13 /= neighborCount;
+						eigenMatrix21 /= neighborCount;
+						eigenMatrix22 /= neighborCount;
+						eigenMatrix23 /= neighborCount;
+						eigenMatrix31 /= neighborCount;
+						eigenMatrix32 /= neighborCount;
+						eigenMatrix33 /= neighborCount;
+
+						float eigenValues1 = 0;
+						float eigenValues2 = 0;
+						float eigenValues3 = 0;
+
+
+
+						float p1 = GMath.Pow(eigenMatrix12, 2) + GMath.Pow(eigenMatrix13, 2) + GMath.Pow(eigenMatrix23, 2);
+						if (p1 == 0)
+						{
+							float v1, v2, v3;
+
+							v1 = eigenMatrix11;
+							v2 = eigenMatrix22;
+							v3 = eigenMatrix33;
+
+							if (v1 >= v2 && v1 >= v3)
+							{
+								eigenValues1 = v1;
+
+								if (v2 >= v3)
+								{
+									eigenValues2 = v2;
+									eigenValues3 = v3;
+								}
+								else
+								{
+									eigenValues2 = v3;
+									eigenValues3 = v2;
+								}
+							}
+							else if (v2 >= v1 && v2 >= v3)
+							{
+								eigenValues1 = v2;
+
+								if (v1 >= v3)
+								{
+									eigenValues2 = v1;
+									eigenValues3 = v3;
+								}
+								else
+								{
+									eigenValues2 = v3;
+									eigenValues3 = v1;
+								}
+							}
+							else if (v3 >= v1 && v3 >= v2)
+							{
+								eigenValues1 = v3;
+
+								if (v1 >= v2)
+								{
+									eigenValues2 = v1;
+									eigenValues3 = v2;
+								}
+								else
+								{
+									eigenValues2 = v2;
+									eigenValues3 = v1;
+								}
+							}
+						}
+						else
+						{
+							float q = (eigenMatrix11 + eigenMatrix22 + eigenMatrix33) / 3;
+							float p2 = GMath.Pow(eigenMatrix11 - q, 2) + GMath.Pow(eigenMatrix22 - q, 2) + GMath.Pow(eigenMatrix33 - q, 2) + 2 * p1;
+							float p = GMath.Sqrt(p2 / 6);
+
+							float B11, B12, B13, B21, B22, B23, B31, B32, B33;
+
+							B11 = (1 / p) * (eigenMatrix11 - q);
+							B12 = (1 / p) * (eigenMatrix12);
+							B13 = (1 / p) * (eigenMatrix13);
+							B21 = (1 / p) * (eigenMatrix21);
+							B22 = (1 / p) * (eigenMatrix22 - q);
+							B23 = (1 / p) * (eigenMatrix23);
+							B31 = (1 / p) * (eigenMatrix31);
+							B32 = (1 / p) * (eigenMatrix32);
+							B33 = (1 / p) * (eigenMatrix33 - q);
+
+							float r = (B11 * B22 * B33 + B12 * B23 * B31 + B13 * B21 * B32 - B13 * B22 * B31 - B11 * B23 * B32 - B12 * B21 * B33) / 2;
+
+							float phi;
+
+							if (r <= -1)
+								phi = GMath.PI / 3;
+							else if (r >= 1)
+								phi = 0;
+							else
+								phi = GMath.Acos(r) / 3;
+
+							eigenValues1 = q + 2 * p * GMath.Cos(phi);
+							eigenValues3 = q + 2 * p * GMath.Cos(phi + (2 * GMath.PI / 3));
+							eigenValues2 = 3 * q - eigenValues1 - eigenValues3;
+						}
+
+
+
+						if (eigenValues1 < 0)
+							eigenValues1 = 0;
+						if (eigenValues2 < 0)
+							eigenValues2 = 0;
+						if (eigenValues3 < 0)
+							eigenValues3 = 0;
+						
+
+						
+						double Linearity = 0;
+						double Planarity = 0;
+						double Sphericity = 0;
+
+
+						if (eigenValues1 > 0)
+						{
+							Linearity = (eigenValues1 - eigenValues2) / eigenValues1;
+							Planarity = (eigenValues2 - eigenValues3) / eigenValues1;
+							Sphericity = eigenValues3 / eigenValues1;
+						}
+
+
+						eigenFeature[i, j, 0] = Linearity;
+						eigenFeature[i, j, 1] = Planarity;
+						eigenFeature[i, j, 2] = Sphericity;
+						
+
+						/*
+						double Linearity = (eigenValues1 - eigenValues2) / eigenValues1;
+						double Planarity = (eigenValues2 - eigenValues3) / eigenValues1;
+						double Sphericity = eigenValues3 / eigenValues1;
+
+						if (!double.IsNaN(Linearity) && !double.IsInfinity(Linearity))
+							eigenFeature[i, j, 0] = Linearity;
+						else
+							eigenFeature[i, j, 0] = 0;
+
+						if (!double.IsNaN(Planarity) && !double.IsInfinity(Planarity))
+							eigenFeature[i, j, 1] = Planarity;
+						else
+							eigenFeature[i, j, 1] = 0;
+
+						if (!double.IsNaN(Sphericity) && !double.IsInfinity(Sphericity))
+							eigenFeature[i, j, 2] = Sphericity;
+						else
+							eigenFeature[i, j, 2] = 0;
+						*/
+
+
+						//eigenFeature[i, j, 0] = xSum;
+						//eigenFeature[i, j, 1] = ySum;
+						//eigenFeature[i, j, 2] = zSum;
+					}
 				}
 			}
 		}
@@ -475,12 +1483,12 @@ namespace Core
 
 			ObjMesh.ObjVertex[] v = model.Vertices;
 
-			xMax = Enumerable.Range(0, v.Length).Select(i => v[i].Vertex.X).Max();
-			xMin = Enumerable.Range(0, v.Length).Select(i => v[i].Vertex.X).Min();
-			yMax = Enumerable.Range(0, v.Length).Select(i => v[i].Vertex.Y).Max();
-			yMin = Enumerable.Range(0, v.Length).Select(i => v[i].Vertex.Y).Min();
-			zMax = Enumerable.Range(0, v.Length).Select(i => v[i].Vertex.Z).Max();
-			zMin = Enumerable.Range(0, v.Length).Select(i => v[i].Vertex.Z).Min();
+			xMax = Enumerable.Range(0, v.Length).AsParallel().Select(i => v[i].Vertex.X).Max();
+			xMin = Enumerable.Range(0, v.Length).AsParallel().Select(i => v[i].Vertex.X).Min();
+			yMax = Enumerable.Range(0, v.Length).AsParallel().Select(i => v[i].Vertex.Y).Max();
+			yMin = Enumerable.Range(0, v.Length).AsParallel().Select(i => v[i].Vertex.Y).Min();
+			zMax = Enumerable.Range(0, v.Length).AsParallel().Select(i => v[i].Vertex.Z).Max();
+			zMin = Enumerable.Range(0, v.Length).AsParallel().Select(i => v[i].Vertex.Z).Min();
 			zMaxAdj = zMax - zMin;
 			zMinAdj = zMin - zMin;
 			zRange = zMax - zMin;
@@ -544,8 +1552,8 @@ namespace Core
 				for (int i = 0; i < pixels.Length; i++)
 					pixels[i] = 1.0f - pixels[i];
 
-
-				for (int i = 0; i < width; i++)
+				Parallel.For(0, width - 1, i =>
+				//for (int i = 0; i < width; i++)
 				{
 					for (int j = 0; j < height; j++)
 					{
@@ -556,6 +1564,7 @@ namespace Core
 							data2DMask[i, j] = false;
 					}
 				}
+				);
 
 				CalAvg();
 
@@ -637,12 +1646,12 @@ namespace Core
 
 
 			//找出bounding box的範圍
-			xMax = Enumerable.Range(0, pcArray.GetLength(0)).Select(i => pcArray[i, 0]).Max();
-			xMin = Enumerable.Range(0, pcArray.GetLength(0)).Select(i => pcArray[i, 0]).Min();
-			yMax = Enumerable.Range(0, pcArray.GetLength(0)).Select(i => pcArray[i, 1]).Max();
-			yMin = Enumerable.Range(0, pcArray.GetLength(0)).Select(i => pcArray[i, 1]).Min();
-			zMax = Enumerable.Range(0, pcArray.GetLength(0)).Select(i => pcArray[i, 2]).Max();
-			zMin = Enumerable.Range(0, pcArray.GetLength(0)).Select(i => pcArray[i, 2]).Min();
+			xMax = Enumerable.Range(0, pcArray.GetLength(0)).AsParallel().Select(i => pcArray[i, 0]).Max();
+			xMin = Enumerable.Range(0, pcArray.GetLength(0)).AsParallel().Select(i => pcArray[i, 0]).Min();
+			yMax = Enumerable.Range(0, pcArray.GetLength(0)).AsParallel().Select(i => pcArray[i, 1]).Max();
+			yMin = Enumerable.Range(0, pcArray.GetLength(0)).AsParallel().Select(i => pcArray[i, 1]).Min();
+			zMax = Enumerable.Range(0, pcArray.GetLength(0)).AsParallel().Select(i => pcArray[i, 2]).Max();
+			zMin = Enumerable.Range(0, pcArray.GetLength(0)).AsParallel().Select(i => pcArray[i, 2]).Min();
 			zMaxAdj = zMax - zMin;
 			zMinAdj = zMin - zMin;
 			zRange = zMax - zMin;
@@ -657,7 +1666,8 @@ namespace Core
 			PointCloud[,] zMaxArray = new PointCloud[width, height];
 
 			//初始化zMaxArray
-			for (int i = 0; i < width; i++)
+			Parallel.For(0, width - 1, i =>
+			//for (int i = 0; i < width; i++)
 			{
 				for (int j = 0; j < height; j++)
 				{
@@ -666,6 +1676,7 @@ namespace Core
 					zMaxArray[i, j].z = zMin;
 				}
 			}
+			);
 
 
 
@@ -684,46 +1695,53 @@ namespace Core
 			}
 
 
+
 			//xyz2dData初始化並填值
 			data2D = new double[width, height, featureDimension];
 			data2DMask = new bool[width, height];
-			for (int i = 0; i < width; i++)
+			Parallel.For(0, width - 1, i =>
+			//for (int i = 0; i < width; i++)
 			{
 				for (int j = 0; j < height; j++)
 				{
 					data2D[i, j, (byte)feature.Height] = zMaxArray[i, height - j - 1].z - zMin;
 				}
 			}
+			);
 
 
 
 			//EmguCV的Morphology處理
 			using (Image<Gray, Double> emguImg = new Image<Gray, Double>(width, height))
 			{
-				for (int i = 0; i < width; i++)
+				Parallel.For(0, width - 1, i =>
+				//for (int i = 0; i < width; i++)
 				{
 					for (int j = 0; j < height; j++)
 					{
 						emguImg.Data[j, i, 0] = data2D[i, j, (byte)feature.Height];
 					}
 				}
+				);
 
 
 				StructuringElementEx StructEle = new StructuringElementEx(structEleSize, structEleSize, (structEleSize - 1) / 2, (structEleSize - 1) / 2, structEleShape);
 				CvInvoke.cvDilate(emguImg, emguImg, StructEle, MorIterNum);
 				CvInvoke.cvErode(emguImg, emguImg, StructEle, MorIterNum);
 
-
-				for (int i = 0; i < width; i++)
+				Parallel.For(0, width - 1, i =>
+				//for (int i = 0; i < width; i++)
 				{
 					for (int j = 0; j < height; j++)
 					{
 						data2D[i, j, (byte)feature.Height] = emguImg.Data[j, i, 0];
 					}
 				}
+				);
 			}
 
-			for (int i = 0; i < width; i++)
+			Parallel.For(0, width - 1, i =>
+			//for (int i = 0; i < width; i++)
 			{
 				for (int j = 0; j < height; j++)
 				{
@@ -733,6 +1751,7 @@ namespace Core
 						data2DMask[i, j] = false;
 				}
 			}
+			);
 
 			CalAvg();
 

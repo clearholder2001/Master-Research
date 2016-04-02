@@ -101,9 +101,11 @@ namespace Core_WinForm_Solution
 					pictureBox1.Image = project.Get_rangeImage();
 
 					project.ifGenerateFeature = false;
+
+					toolStripStatusLabel1.Text = "Load point cloud done.";
 				}
 			}
-		}	
+		}
 
 		private void polygonalModelDatabaseToolStripMenuItem_Click(object sender, EventArgs e)
 		{
@@ -124,6 +126,8 @@ namespace Core_WinForm_Solution
 						listBox1.Items.Add(Path.GetFileNameWithoutExtension(fileName));
 
 						project.ifGenerateFeature = false;
+
+						toolStripStatusLabel1.Text = "Load polygonal model to list done.";
 					}
 				}
 			}
@@ -131,21 +135,21 @@ namespace Core_WinForm_Solution
 
 		private void updateParametersToolStripMenuItem_Click(object sender, EventArgs e)
 		{
-			project.ifGenerateFeature = false;
-			listView2.Clear();
-
 			if (!project.Set_parameter())
 			{
 				MessageBox.Show("Invalid parameter!");
-			}			
+			}
 			else
 			{
 				project.Reload_pointCloud();
 				Bitmap img = project.Get_rangeImage();
 				if (img != null)
 				{
-					pictureBox1.Image = project.Get_rangeImage();
+					pictureBox1.Image = img;
 				}
+
+				project.ifGenerateFeature = false;
+				listView2.Clear();
 
 				toolStripStatusLabel1.Text = "Update parameters done.";
 			}
@@ -165,7 +169,7 @@ namespace Core_WinForm_Solution
 				}
 				else
 				{
-
+					return;
 				}
 			}
 		}
@@ -204,6 +208,9 @@ namespace Core_WinForm_Solution
 
 		private void loadPolygonalModelsFromListToolStripMenuItem_Click(object sender, EventArgs e)
 		{
+			if (backgroundWorker_loadPolygonalModel.IsBusy)
+				return;
+
 			if (listBox1.Items.Count == 0 && project.Return_polygonalModelFileName().Count == 0)
 			{
 				MessageBox.Show("Please load file first!");
@@ -281,7 +288,10 @@ namespace Core_WinForm_Solution
 
 		private void generateAnnularFeatureToolStripMenuItem_Click(object sender, EventArgs e)
 		{
-			if (pictureBox1.Image == null || project.Return_polygonalModelFileName().Count == 0)
+			if (backgroundWorker_loadPolygonalModel.IsBusy)
+				return;
+
+			if (pictureBox1.Image == null || project.Return_polygonalModelFileName().Count == 0 || listView1.Items.Count == 0)
 			{
 				MessageBox.Show("Please load file first!");
 				return;
@@ -316,7 +326,7 @@ namespace Core_WinForm_Solution
 			sw.Stop();
 
 			project.ifGenerateFeature = true;
-			
+
 			toolStripStatusLabel1.Text = "Generate annular feature done. (" + String.Format("{0:0.000}", sw.Elapsed.TotalSeconds) + "s)";
 		}
 
@@ -453,7 +463,7 @@ namespace Core_WinForm_Solution
 			for (int i = 0; i < rankingIndex.Length; i++)
 			{
 				Bitmap img = utilClass.ResizeBitmap2Square(project.Get_rangeImage(rankingIndex[i]));
-				listView2.Items.Add((i + 1)  + ": " + Path.GetFileNameWithoutExtension(listBox1.Items[rankingIndex[i]].ToString()) + " (" + String.Format("{0:0.000}", rankingDistance[rankingIndex[i]]) + ")");
+				listView2.Items.Add((i + 1) + ": " + Path.GetFileNameWithoutExtension(listBox1.Items[rankingIndex[i]].ToString()) + " (" + String.Format("{0:0.000}", rankingDistance[rankingIndex[i]]) + ")");
 				listView2.Items[i].ImageIndex = rankingIndex[i];
 			}
 
@@ -467,7 +477,7 @@ namespace Core_WinForm_Solution
 			else
 			{
 				sw.Stop();
-				toolStripStatusLabel1.Text = "Retrieve and rank done. (" + String.Format("{0:0.000}",sw.Elapsed.TotalSeconds) + "s)";
+				toolStripStatusLabel1.Text = "Retrieve and rank done. (" + String.Format("{0:0.000}", sw.Elapsed.TotalSeconds) + "s)";
 			}
 		}
 
@@ -487,6 +497,13 @@ namespace Core_WinForm_Solution
 
 		private void backgroundWorker_loadPolygonalModel_ProgressChanged(object sender, ProgressChangedEventArgs e)
 		{
+			//int i = toolStripProgressBar1.Value;
+			//Bitmap img = utilClass.ResizeBitmap2Square(project.Get_rangeImage(i));
+			//string key = Path.GetFileNameWithoutExtension(listBox1.Items[i].ToString());
+			//imageList1.Images.Add(key, img);
+			//listView1.Items.Add(key);
+			//listView1.Items[i].ImageKey = key;
+
 			toolStripProgressBar1.Value = e.ProgressPercentage;
 			toolStripStatusLabel1.Text = "Loading polygonal model......(" + e.ProgressPercentage.ToString() + " / " + toolStripProgressBar1.Maximum.ToString() + ")";
 		}
@@ -524,7 +541,7 @@ namespace Core_WinForm_Solution
 		//backgroundWorker_generateFeature
 		private void backgroundWorker_generateFeature_DoWork(object sender, DoWorkEventArgs e)
 		{
-			project.Generate_feature_withProgress(backgroundWorker_generateFeature, e);
+			project.Generate_feature_withProgress(backgroundWorker_generateFeature, e, checkBox_GPU_Acceleration.Checked);
 		}
 
 		private void backgroundWorker_generateFeature_ProgressChanged(object sender, ProgressChangedEventArgs e)

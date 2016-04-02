@@ -41,9 +41,11 @@
 			this.generateAnnularFeatureToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
 			this.retrieveAndRankToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
 			this.cancelToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+			this.generateAnnularFeatureonlyForPointCloudToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
 			this.scheduleToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
 			this.allInOneClickToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
 			this.groupBox1 = new System.Windows.Forms.GroupBox();
+			this.checkBox_GPU_Acceleration = new System.Windows.Forms.CheckBox();
 			this.comboBox3 = new System.Windows.Forms.ComboBox();
 			this.label3 = new System.Windows.Forms.Label();
 			this.textBox2 = new System.Windows.Forms.TextBox();
@@ -64,14 +66,14 @@
 			this.detailToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
 			this.listView2 = new System.Windows.Forms.ListView();
 			this.groupBox2 = new System.Windows.Forms.GroupBox();
+			this.checkBox1 = new System.Windows.Forms.CheckBox();
 			this.label2 = new System.Windows.Forms.Label();
 			this.label1 = new System.Windows.Forms.Label();
 			this.textBox1 = new System.Windows.Forms.TextBox();
 			this.comboBox1 = new System.Windows.Forms.ComboBox();
 			this.checkedListBox1 = new System.Windows.Forms.CheckedListBox();
 			this.button_removeAllPolygonalModel = new System.Windows.Forms.Button();
-			this.checkBox1 = new System.Windows.Forms.CheckBox();
-			this.generateAnnularFeatureonlyForPointCloudToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+			this.toolStripMenuItem1 = new System.Windows.Forms.ToolStripSeparator();
 			this.menuStrip1.SuspendLayout();
 			this.groupBox1.SuspendLayout();
 			((System.ComponentModel.ISupportInitialize)(this.pictureBox1)).BeginInit();
@@ -146,6 +148,7 @@
             this.loadPolygonalModelsFromListToolStripMenuItem,
             this.generateAnnularFeatureToolStripMenuItem,
             this.retrieveAndRankToolStripMenuItem,
+            this.toolStripMenuItem1,
             this.cancelToolStripMenuItem,
             this.generateAnnularFeatureonlyForPointCloudToolStripMenuItem});
 			this.workflowToolStripMenuItem.Name = "workflowToolStripMenuItem";
@@ -180,6 +183,13 @@
 			this.cancelToolStripMenuItem.Text = "Cancel";
 			this.cancelToolStripMenuItem.Click += new System.EventHandler(this.cancelToolStripMenuItem_Click);
 			// 
+			// generateAnnularFeatureonlyForPointCloudToolStripMenuItem
+			// 
+			this.generateAnnularFeatureonlyForPointCloudToolStripMenuItem.Name = "generateAnnularFeatureonlyForPointCloudToolStripMenuItem";
+			this.generateAnnularFeatureonlyForPointCloudToolStripMenuItem.Size = new System.Drawing.Size(339, 22);
+			this.generateAnnularFeatureonlyForPointCloudToolStripMenuItem.Text = "Generate Annular Feature (only for point cloud)";
+			this.generateAnnularFeatureonlyForPointCloudToolStripMenuItem.Click += new System.EventHandler(this.generateAnnularFeatureonlyForPointCloudToolStripMenuItem_Click);
+			// 
 			// scheduleToolStripMenuItem
 			// 
 			this.scheduleToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
@@ -197,22 +207,35 @@
 			// 
 			// groupBox1
 			// 
+			this.groupBox1.Controls.Add(this.checkBox_GPU_Acceleration);
 			this.groupBox1.Controls.Add(this.comboBox3);
 			this.groupBox1.Controls.Add(this.label3);
 			this.groupBox1.Controls.Add(this.textBox2);
 			this.groupBox1.Controls.Add(this.comboBox2);
 			this.groupBox1.Location = new System.Drawing.Point(12, 27);
 			this.groupBox1.Name = "groupBox1";
-			this.groupBox1.Size = new System.Drawing.Size(200, 146);
+			this.groupBox1.Size = new System.Drawing.Size(200, 179);
 			this.groupBox1.TabIndex = 1;
 			this.groupBox1.TabStop = false;
 			this.groupBox1.Text = "Parameters";
+			// 
+			// checkBox_GPU_Acceleration
+			// 
+			this.checkBox_GPU_Acceleration.AutoSize = true;
+			this.checkBox_GPU_Acceleration.Checked = true;
+			this.checkBox_GPU_Acceleration.CheckState = System.Windows.Forms.CheckState.Checked;
+			this.checkBox_GPU_Acceleration.Location = new System.Drawing.Point(21, 146);
+			this.checkBox_GPU_Acceleration.Name = "checkBox_GPU_Acceleration";
+			this.checkBox_GPU_Acceleration.Size = new System.Drawing.Size(107, 16);
+			this.checkBox_GPU_Acceleration.TabIndex = 8;
+			this.checkBox_GPU_Acceleration.Text = "GPU Acceleration";
+			this.checkBox_GPU_Acceleration.UseVisualStyleBackColor = true;
 			// 
 			// comboBox3
 			// 
 			this.comboBox3.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
 			this.comboBox3.FormattingEnabled = true;
-			this.comboBox3.Location = new System.Drawing.Point(21, 111);
+			this.comboBox3.Location = new System.Drawing.Point(21, 115);
 			this.comboBox3.Name = "comboBox3";
 			this.comboBox3.Size = new System.Drawing.Size(160, 20);
 			this.comboBox3.TabIndex = 7;
@@ -221,7 +244,7 @@
 			// label3
 			// 
 			this.label3.AutoSize = true;
-			this.label3.Location = new System.Drawing.Point(19, 88);
+			this.label3.Location = new System.Drawing.Point(19, 92);
 			this.label3.Name = "label3";
 			this.label3.Size = new System.Drawing.Size(119, 12);
 			this.label3.TabIndex = 6;
@@ -229,7 +252,7 @@
 			// 
 			// textBox2
 			// 
-			this.textBox2.Location = new System.Drawing.Point(21, 55);
+			this.textBox2.Location = new System.Drawing.Point(21, 59);
 			this.textBox2.Name = "textBox2";
 			this.textBox2.Size = new System.Drawing.Size(160, 22);
 			this.textBox2.TabIndex = 5;
@@ -239,7 +262,7 @@
 			// 
 			this.comboBox2.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
 			this.comboBox2.FormattingEnabled = true;
-			this.comboBox2.Location = new System.Drawing.Point(21, 24);
+			this.comboBox2.Location = new System.Drawing.Point(21, 28);
 			this.comboBox2.Name = "comboBox2";
 			this.comboBox2.Size = new System.Drawing.Size(160, 20);
 			this.comboBox2.TabIndex = 5;
@@ -248,7 +271,7 @@
 			// pictureBox1
 			// 
 			this.pictureBox1.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
-			this.pictureBox1.Location = new System.Drawing.Point(12, 179);
+			this.pictureBox1.Location = new System.Drawing.Point(12, 214);
 			this.pictureBox1.Name = "pictureBox1";
 			this.pictureBox1.Size = new System.Drawing.Size(200, 200);
 			this.pictureBox1.SizeMode = System.Windows.Forms.PictureBoxSizeMode.Zoom;
@@ -319,9 +342,9 @@
 			this.listBox1.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
 			this.listBox1.FormattingEnabled = true;
 			this.listBox1.ItemHeight = 12;
-			this.listBox1.Location = new System.Drawing.Point(12, 385);
+			this.listBox1.Location = new System.Drawing.Point(12, 421);
 			this.listBox1.Name = "listBox1";
-			this.listBox1.Size = new System.Drawing.Size(200, 290);
+			this.listBox1.Size = new System.Drawing.Size(200, 242);
 			this.listBox1.TabIndex = 6;
 			// 
 			// button_removePolygonalModel
@@ -390,6 +413,18 @@
 			this.groupBox2.TabStop = false;
 			this.groupBox2.Text = "Ranking";
 			// 
+			// checkBox1
+			// 
+			this.checkBox1.AutoSize = true;
+			this.checkBox1.Checked = true;
+			this.checkBox1.CheckState = System.Windows.Forms.CheckState.Checked;
+			this.checkBox1.Location = new System.Drawing.Point(21, 215);
+			this.checkBox1.Name = "checkBox1";
+			this.checkBox1.Size = new System.Drawing.Size(80, 16);
+			this.checkBox1.TabIndex = 5;
+			this.checkBox1.Text = "Size Weight";
+			this.checkBox1.UseVisualStyleBackColor = true;
+			// 
 			// label2
 			// 
 			this.label2.AutoSize = true;
@@ -445,24 +480,10 @@
 			this.button_removeAllPolygonalModel.UseVisualStyleBackColor = true;
 			this.button_removeAllPolygonalModel.Click += new System.EventHandler(this.button_removeAllPolygonalModel_Click);
 			// 
-			// checkBox1
+			// toolStripMenuItem1
 			// 
-			this.checkBox1.AutoSize = true;
-			this.checkBox1.Checked = true;
-			this.checkBox1.CheckState = System.Windows.Forms.CheckState.Checked;
-			this.checkBox1.Location = new System.Drawing.Point(21, 215);
-			this.checkBox1.Name = "checkBox1";
-			this.checkBox1.Size = new System.Drawing.Size(80, 16);
-			this.checkBox1.TabIndex = 5;
-			this.checkBox1.Text = "Size Weight";
-			this.checkBox1.UseVisualStyleBackColor = true;
-			// 
-			// generateAnnularFeatureonlyForPointCloudToolStripMenuItem
-			// 
-			this.generateAnnularFeatureonlyForPointCloudToolStripMenuItem.Name = "generateAnnularFeatureonlyForPointCloudToolStripMenuItem";
-			this.generateAnnularFeatureonlyForPointCloudToolStripMenuItem.Size = new System.Drawing.Size(339, 22);
-			this.generateAnnularFeatureonlyForPointCloudToolStripMenuItem.Text = "Generate Annular Feature (only for point cloud)";
-			this.generateAnnularFeatureonlyForPointCloudToolStripMenuItem.Click += new System.EventHandler(this.generateAnnularFeatureonlyForPointCloudToolStripMenuItem_Click);
+			this.toolStripMenuItem1.Name = "toolStripMenuItem1";
+			this.toolStripMenuItem1.Size = new System.Drawing.Size(336, 6);
 			// 
 			// Form1
 			// 
@@ -547,6 +568,8 @@
 		private System.Windows.Forms.ToolStripMenuItem updateParametersToolStripMenuItem;
 		private System.Windows.Forms.CheckBox checkBox1;
 		private System.Windows.Forms.ToolStripMenuItem generateAnnularFeatureonlyForPointCloudToolStripMenuItem;
+		private System.Windows.Forms.CheckBox checkBox_GPU_Acceleration;
+		private System.Windows.Forms.ToolStripSeparator toolStripMenuItem1;
 	}
 }
 
