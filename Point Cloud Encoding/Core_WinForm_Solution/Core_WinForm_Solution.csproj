@@ -176,9 +176,7 @@
     <None Include="App.config" />
   </ItemGroup>
   <ItemGroup>
-    <Content Include="Cudafy.NET.dll">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </Content>
+    <Content Include="Cudafy.NET.dll" />
     <Content Include="Library\Emgu.CV.dll">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
@@ -203,9 +201,7 @@
     <Content Include="Library\ZedGraph.dll">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
-    <Content Include="MathNet.Numerics.CUDA.dll">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </Content>
+    <Content Include="MathNet.Numerics.CUDA.dll" />
     <Content Include="opencv_core2410.dll">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
