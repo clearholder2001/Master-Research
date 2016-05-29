@@ -1,0 +1,115 @@
+﻿using System;
+using System.Linq;
+
+namespace DBQuery
+{
+	public class DBRecord
+	{
+		public enum feature : byte { Height, Edge, Linearity, Planarity, Sphericity }
+		public enum sizeFeature : byte { zRange, zAvg, totalArea, totalVol, radiusMax }
+		public double zRange, zAvg, totalArea, totalVol, radiusMax;
+		public double[,] featureValue;
+
+		public const int annularNum = 30;
+		public const int recordLength = sizeFeatureNum + featureDimension * annularNum;
+		public const int sizeFeatureNum = 5;
+		public const int featureDimension = 3;
+
+		public DBRecord()
+		{
+			featureValue = new double[featureDimension, annularNum];
+		}
+
+		public bool LoadFeature(double[] doubleArray)
+		{
+			//檢查長度
+			if (doubleArray.Length != recordLength)
+				return false;
+
+			zRange = doubleArray[0];
+			zAvg = doubleArray[1];
+			totalArea = doubleArray[2];
+			totalVol = doubleArray[3];
+			radiusMax = doubleArray[4];
+
+//			for (int i = 0; i < featureDimension; i++)
+//			{
+//				for (int j = 0; j < annularNum; j++)
+//				{
+//					featureValue[i, j] = doubleArray[sizeFeatureNum + i * annularNum + j];
+//				}
+//			}
+
+			Buffer.BlockCopy(doubleArray, sizeFeatureNum * sizeof(double), featureValue, 0, annularNum * featureDimension * sizeof(double));
+
+			return true;
+		}
+
+		public void NormalizeFeature()
+		{
+			double sum;
+			double[,] newFeatureValue = new double[featureDimension, annularNum];
+
+			for (int i = 0; i < featureDimension; i++)
+			{
+				sum = Enumerable.Range(0, annularNum).AsParallel().Select(a => featureValue[i, a]).Sum();
+
+				for (int j = 0; j < annularNum; j++)
+				{
+					if (sum != 0.0)
+						newFeatureValue[i, j] = featureValue[i, j] / sum;
+					else
+						newFeatureValue[i, j] = 0.0;
+				}
+			}
+
+			featureValue = newFeatureValue;
+		}
+
+		public string OutputSeries()
+		{
+			string series = string.Empty;
+
+			series += zRange + "\n";
+			series += zAvg + "\n";
+			series += totalArea + "\n";
+			series += totalVol + "\n";
+			series += radiusMax + "\n";
+
+
+			for (int i = 0; i < featureDimension; i++)
+			{
+				for (int j = 0; j < annularNum; j++)
+				{
+					series += featureValue[i, j] + "\n";
+				}
+			}
+
+			return series;
+		}
+
+		public byte[] ConvertToByteArray()
+		{
+			//no Linearity and Sphericity
+			double[] blobDoubleArray = new double[sizeFeatureNum + annularNum * 3];
+			byte[] blobByteArray = new byte[sizeof(double) * (sizeFeatureNum + annularNum * 3)];
+
+			blobDoubleArray[0] = zRange;
+			blobDoubleArray[1] = zAvg;
+			blobDoubleArray[2] = totalArea;
+			blobDoubleArray[3] = totalVol;
+			blobDoubleArray[4] = radiusMax;
+
+			for (int i = 0; i < annularNum; i++)
+			{
+				blobDoubleArray[5 + annularNum * 0 + i] = featureValue[0, i];
+				blobDoubleArray[5 + annularNum * 1 + i] = featureValue[1, i];
+				blobDoubleArray[5 + annularNum * 2 + i] = featureValue[3, i];
+			}
+
+			Buffer.BlockCopy(blobDoubleArray, 0, blobByteArray, 0, blobByteArray.Length);
+
+			return blobByteArray;
+		}
+	}
+}

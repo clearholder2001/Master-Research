@@ -1,0 +1,76 @@
+﻿# initPath Y:\data4\db
+# rootPath Y
+# targetPath Z
+# targetPath C:\Others\db_test
+
+
+# initPath C:\Users\Yi-Chen\CloudStation\Debug
+# rootPath C:\Users\Yi-Chen\CloudStation\Debug
+# targetPath C:\Users\Yi-Chen\CloudStation\Debug
+
+
+# C:\Users\Yi-Chen\CloudStation\Debug
+# D:\Users\Yi-Chen\Desktop\debug
+# pathDirRegex .*\\[0-9][0-9a-z]$
+
+# pathDirRegex .*\\[b][0-9a-z]$
+
+# overWrite 0
+# fileMaxSize 536870912
+# sourceExtenstion obj00
+outputExtension txt00
+# saveRangeImage 1
+
+
+enableCUDA 1
+ePlatform 2
+eArchitecture 306
+CUDAGenerateDebug 0
+CUDADeviceId 0
+threadMaxNum 64
+
+
+gridSize 0.25
+annularNum 30
+laplacianAperture 3
+gaussianAperture 7
+eigenFeatureDiameterMultiple 4
+borderAdditionWidth 10
+thumbnailImgMaxSize 100
+structEleSize 7
+morIterNum 3
+structEleShape 0
+
+
+dbName All-979687-0525-f3.db
+WeightOfEdgeFeature 0.3
+rankingResultNum 100
+
+
+sqlDBHost 140.116.80.133
+sqlDBUser encoding
+sqlDBPass encoding
+sqlDBName model_retrieval
+sqlQueryResultTableName query_result
+sqlQueryTableName models_979687_0525
+
+
+# eArchitecture
+# sm_10 266
+# sm_11 267
+# sm_12 268
+# sm_13 269
+# sm_20 276
+# sm_21 277
+# sm_30 286
+# sm_35 291
+# sm_37 293
+# sm_50 306
+# sm_52 308
+
+
+# structEleShape
+# CV_SHAPE_RECT 0
+# CV_SHAPE_CROSS 1
+# CV_SHAPE_ELLIPSE 2
+# CV_SHAPE_CUSTOM 100
