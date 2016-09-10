@@ -1,5 +1,8 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
 
 namespace DBQuery
 {
@@ -10,10 +13,10 @@ namespace DBQuery
 		public double zRange, zAvg, totalArea, totalVol, radiusMax;
 		public double[,] featureValue;
 
-		public static int annularNum = 30;
-		public static int recordLength = sizeFeatureNum + featureDimension * annularNum;
-		public const int sizeFeatureNum = 5;
-		public const int featureDimension = 3;
+		public const int featureHeaderNum = 5;
+		public const int featureDimension = 5;
+		public const int annularNum = 30;
+		public const int recordLength = featureHeaderNum + featureDimension * annularNum;
 
 		public DBRecord()
 		{
@@ -32,15 +35,13 @@ namespace DBQuery
 			totalVol = doubleArray[3];
 			radiusMax = doubleArray[4];
 
-//			for (int i = 0; i < featureDimension; i++)
-//			{
-//				for (int j = 0; j < annularNum; j++)
-//				{
-//					featureValue[i, j] = doubleArray[sizeFeatureNum + i * annularNum + j];
-//				}
-//			}
-
-			Buffer.BlockCopy(doubleArray, sizeFeatureNum * sizeof(double), featureValue, 0, annularNum * featureDimension * sizeof(double));
+			for (int i = 0; i < featureDimension; i++)
+			{
+				for (int j = 0; j < annularNum; j++)
+				{
+					featureValue[i, j] = doubleArray[featureHeaderNum + i * annularNum + j];
+				}
+			}
 
 			return true;
 		}
@@ -91,8 +92,8 @@ namespace DBQuery
 		public byte[] ConvertToByteArray()
 		{
 			//no Linearity and Sphericity
-			double[] blobDoubleArray = new double[sizeFeatureNum + annularNum * 3];
-			byte[] blobByteArray = new byte[sizeof(double) * (sizeFeatureNum + annularNum * 3)];
+			double[] blobDoubleArray = new double[featureHeaderNum + annularNum * 3];
+			byte[] blobByteArray = new byte[sizeof(double) * (featureHeaderNum + annularNum * 3)];
 
 			blobDoubleArray[0] = zRange;
 			blobDoubleArray[1] = zAvg;

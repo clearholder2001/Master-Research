@@ -30,8 +30,11 @@ namespace ConsoleKernel
 		static int Main(string[] args)
 		{
 			//args = new string[1];
+			//args[0] = "66c84c634e4a50637b74dbf49fa9bf7e.obj";
+			//args[0] = "1_2.obj";
 			//args[0] = "Far Eastern Department Store.xyz";
 			//args[0] = "Dept. of Geomatics.xyz";
+			//args[0] = "Living Mall.xyz";
 			//args[0] = "1-1.obj";
 			//args[0] = "test.txt00";
 			//args[0] = "187054";
@@ -42,7 +45,7 @@ namespace ConsoleKernel
 
 
 			string logName = DateTime.Now.ToString().Replace('/', '-').Replace(' ', '-').Replace(':', '-') + ".clog";
-			ConsoleCopy consoleCopy = new ConsoleCopy("query\\" + logName);
+			ConsoleCopy consoleCopy = new ConsoleCopy("query/" + logName);
 
 
 
@@ -140,15 +143,10 @@ namespace ConsoleKernel
 			{
 				sw.Start();
 				
-				//產生range image
-				core.GenerateRangeImage();
 
-				//產生feature
-				core.GenerateFeature();
-
-				if (core.GenerateRangeImage())
+				if (core.GenerateRangeImage()) //產生range image
 				{
-					if (core.GenerateFeature())
+					if (core.GenerateFeature()) //產生feature
 					{
 						//Encoding完成！
 					}
@@ -168,11 +166,11 @@ namespace ConsoleKernel
 				//range image存檔
 				if (project.saveRangeImage)
 				{
-					core.rangeImg.Save("query\\query_range_image.tiff", System.Drawing.Imaging.ImageFormat.Tiff);
+					core.rangeImg.Save("query/query_range_image.bmp", System.Drawing.Imaging.ImageFormat.Bmp);
 				}
 
 				//feature存檔
-				core.SaveResult("query\\query_encoding_result." + project.outputExtension, true);
+				core.SaveResult("query/query_encoding_result." + project.outputExtension, true);
 
 				sw.Stop();
 
@@ -243,8 +241,14 @@ namespace ConsoleKernel
 				}
 			}
 
+			sw.Stop();
+
+			Console.WriteLine("Load database done. {0}ms", sw.ElapsedMilliseconds);
+
 
 			//query
+			sw.Restart();
+
 			if (dbQuery.Query())
 			{
 				if (dbQuery.ConnectMariaDB(project.sqlDBHost, project.sqlDBUser, project.sqlDBPass, project.sqlDBName))
@@ -275,7 +279,7 @@ namespace ConsoleKernel
 
 			sw.Stop();
 
-			Console.WriteLine("Load database & query done. {0}ms", sw.ElapsedMilliseconds);
+			Console.WriteLine("Query done. {0}ms", sw.ElapsedMilliseconds);
 
 			#endregion
 

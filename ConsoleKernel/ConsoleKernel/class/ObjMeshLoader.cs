@@ -1,4 +1,4 @@
-//using System;
+using System;
 using System.IO;
 using System.Collections.Generic;
 using OpenTK.Math;
@@ -52,11 +52,16 @@ public class ObjMeshLoader
                     break;
 
                 case "v": // Vertex
-                    float x = float.Parse(parameters[1]);
-                    float y = float.Parse(parameters[2]);
-                    float z = float.Parse(parameters[3]);
-                    vertices.Add(new Vector3(x, y, z));
-                    break;
+                    //float x = float.Parse(parameters[1]);
+                    //float y = float.Parse(parameters[2]);
+                    //float z = float.Parse(parameters[3]);
+					//vertices.Add(new Vector3(x, y, z));
+					ObjMesh.ObjVertex objVertex = new ObjMesh.ObjVertex();
+					objVertex.Vertex.X = float.Parse(parameters[1]);
+					objVertex.Vertex.Y = float.Parse(parameters[2]);
+					objVertex.Vertex.Z = float.Parse(parameters[3]);
+					objVertices.Add(objVertex);
+					break;
 				
 				/*
                 case "vt": // TexCoord
@@ -78,19 +83,26 @@ public class ObjMeshLoader
                     {
                         case 4:
                             ObjMesh.ObjTriangle objTriangle = new ObjMesh.ObjTriangle();
-                            objTriangle.Index0 = ParseFaceParameter(parameters[1]);
-                            objTriangle.Index1 = ParseFaceParameter(parameters[2]);
-                            objTriangle.Index2 = ParseFaceParameter(parameters[3]);
-                            objTriangles.Add(objTriangle);
+                            //objTriangle.Index0 = ParseFaceParameter(parameters[1]);
+                            //objTriangle.Index1 = ParseFaceParameter(parameters[2]);
+                            //objTriangle.Index2 = ParseFaceParameter(parameters[3]);
+							objTriangle.Index0 = int.Parse(parameters[1]) - 1;
+							objTriangle.Index1 = int.Parse(parameters[2]) - 1;
+							objTriangle.Index2 = int.Parse(parameters[3]) - 1;
+							objTriangles.Add(objTriangle);
                             break;
 
                         case 5:
                             ObjMesh.ObjQuad objQuad = new ObjMesh.ObjQuad();
-                            objQuad.Index0 = ParseFaceParameter(parameters[1]);
-                            objQuad.Index1 = ParseFaceParameter(parameters[2]);
-                            objQuad.Index2 = ParseFaceParameter(parameters[3]);
-                            objQuad.Index3 = ParseFaceParameter(parameters[4]);
-                            objQuads.Add(objQuad);
+                            //objQuad.Index0 = ParseFaceParameter(parameters[1]);
+                            //objQuad.Index1 = ParseFaceParameter(parameters[2]);
+                            //objQuad.Index2 = ParseFaceParameter(parameters[3]);
+                            //objQuad.Index3 = ParseFaceParameter(parameters[4]);
+							objQuad.Index0 = int.Parse(parameters[1]) - 1;
+							objQuad.Index1 = int.Parse(parameters[2]) - 1;
+							objQuad.Index2 = int.Parse(parameters[3]) - 1;
+							objQuad.Index3 = int.Parse(parameters[4]) - 1;
+							objQuads.Add(objQuad);
                             break;
                     }
                     break;
@@ -149,11 +161,11 @@ public class ObjMeshLoader
         newObjVertex.Vertex = vertex;
         newObjVertex.TexCoord = texCoord;
         newObjVertex.Normal = normal;
-
+		/*
 		objVertices.Add(newObjVertex);
 		return objVertices.Count - 1;
-
-		/*
+		*/
+		
 		int index;
         if (objVerticesIndexDictionary.TryGetValue(newObjVertex, out index))
         {
@@ -165,6 +177,6 @@ public class ObjMeshLoader
             objVerticesIndexDictionary[newObjVertex] = objVertices.Count - 1;
             return objVertices.Count - 1;
         }
-		*/
+		
     }
 }

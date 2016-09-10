@@ -4,16 +4,13 @@ using System.Linq;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
 
-using DBQuery;
-
 namespace Core
 {
-	class Project
+	public class Project
 	{
 		public string initPath, rootPath, targetPath;
-		public string dbName, sqlDBHost, sqlDBUser, sqlDBPass, sqlDBName, sqlQueryResultTableName, sqlQueryTableName;
-		public bool enableCUDA, CUDAGenerateDebug, overWrite, saveRangeImage;
-		public int threadMaxNum, ePlatform, eArchitecture, CUDADeviceId;
+		public bool enableCUDA, CUDAGenerateDebug, overWrite, saveRangeImage, RunWithoutYes;
+		public int startIndex, threadMaxNum, gcFrequency, degreeOfParallelism, ePlatform, CUDADeviceId;
 		public long fileMaxSize;
 		public string pathDirRegex, sourceExtension, outputExtension;
 
@@ -27,8 +24,6 @@ namespace Core
 		public int structEleSize { get; private set; }
 		public int morIterNum { get; private set; }
 		public int structEleShape { get; private set; }
-		public double WeightOfEdgeFeature { get; private set; }
-		public int rankingResultNum { get; private set; }
 
 		public List<string> dirList, fileList;
 		public string[] dirListArray, fileListArray;
@@ -38,6 +33,10 @@ namespace Core
 		{
 			dirList = new List<string>();
 			fileList = new List<string>();
+
+			startIndex = 0;
+
+			objClass.InitOpenGL();
 		}
 
 		public bool LoadConfig()
@@ -80,7 +79,7 @@ namespace Core
 							IEnumerable<string> enumFileNames = from dir in Directory.EnumerateFiles(dirListArray[i], "*.*", SearchOption.AllDirectories)
 																select dir;
 
-							ParallelQuery<string> queryFileNames = from file in enumFileNames.AsParallel()
+							ParallelQuery<string> queryFileNames = from file in enumFileNames.AsParallel().WithDegreeOfParallelism(degreeOfParallelism)
 																   where Path.GetExtension(file) == "." + sourceExtension
 																   select file;
 
@@ -95,7 +94,7 @@ namespace Core
 					IEnumerable<string> enumFileNames = from dir in Directory.EnumerateFiles(initPath, "*.*", SearchOption.AllDirectories)
 														select dir;
 
-					ParallelQuery<string> queryFileNames = from file in enumFileNames.AsParallel()
+					ParallelQuery<string> queryFileNames = from file in enumFileNames.AsParallel().WithDegreeOfParallelism(degreeOfParallelism)
 														   where Path.GetExtension(file) == "." + sourceExtension
 														   select file;
 
@@ -118,15 +117,18 @@ namespace Core
 			s += "initPath: " + initPath + "\n";
 			s += "rootPath: " + rootPath + "\n";
 			s += "targetPath: " + targetPath + "\n";
+			s += "startIndex: " + startIndex + "\n";
 			s += "pathDirRegex: " + pathDirRegex + "\n";
 			s += "overWrite: " + overWrite.ToString() + "\n";
+			s += "gcFrequency: " + gcFrequency + "\n";
 			s += "fileMaxSize: " + fileMaxSize.ToString() + " bytes\n";
 			s += "sourceExtenstion: " + sourceExtension + "\n";
 			s += "outputExtension: " + outputExtension + "\n";
 			s += "saveRangeImage: " + saveRangeImage.ToString() + "\n";
+			s += "RunWithoutYes: " + RunWithoutYes.ToString() + "\n";
+			s += "degreeOfParallelism: " + degreeOfParallelism + "\n";
 			s += "enableCUDA: " + enableCUDA.ToString() + "\n";
 			s += "ePlatform: " + ePlatform + "\n";
-			s += "eArchitecture: " + eArchitecture + "\n";
 			s += "CUDAGenerateDebug: " + CUDAGenerateDebug.ToString() + "\n";
 			s += "CUDADeviceId: " + CUDADeviceId + "\n";
 			s += "threadMaxNum: " + threadMaxNum + "\n";
@@ -140,15 +142,6 @@ namespace Core
 			s += "structEleSize: " + structEleSize + "\n";
 			s += "morIterNum: " + morIterNum + "\n";
 			s += "structEleShape: " + structEleShape + "\n";
-			s += "dbName: " + dbName + "\n";
-			s += "WeightOfEdgeFeature: " + WeightOfEdgeFeature + "\n";
-			s += "rankingResultNum: " + rankingResultNum + "\n";
-			s += "sqlDBHost: " + sqlDBHost + "\n";
-			s += "sqlDBUser: " + sqlDBUser + "\n";
-			s += "sqlDBPass: " + sqlDBPass + "\n";
-			s += "sqlDBName: " + sqlDBName + "\n";
-			s += "sqlQueryResultTableName: " + sqlQueryResultTableName + "\n";
-			s += "sqlQueryTableName: " + sqlQueryTableName + "\n";
 			s += "###########################################################################" + "\n";
 
 			return s;
@@ -187,11 +180,17 @@ namespace Core
 								case "targetPath":
 									targetPath = paramArray[1];
 									break;
+								case "startIndex":
+									startIndex = Convert.ToInt32(paramArray[1]);
+									break;
 								case "pathDirRegex":
 									pathDirRegex = paramArray[1];
 									break;
 								case "overWrite":
 									overWrite = Convert.ToInt32(paramArray[1]) != 0 ? true : false;
+									break;
+								case "gcFrequency":
+									gcFrequency = Convert.ToInt32(paramArray[1]);
 									break;
 								case "fileMaxSize":
 									fileMaxSize = Convert.ToInt64(paramArray[1]);
@@ -205,14 +204,17 @@ namespace Core
 								case "saveRangeImage":
 									saveRangeImage = Convert.ToInt32(paramArray[1]) != 0 ? true : false;
 									break;
+								case "RunWithoutYes":
+									RunWithoutYes = Convert.ToInt32(paramArray[1]) != 0 ? true : false;
+									break;
+								case "degreeOfParallelism":
+									degreeOfParallelism = Convert.ToInt32(paramArray[1]);
+									break;
 								case "enableCUDA":
 									enableCUDA = Convert.ToInt32(paramArray[1]) != 0 ? true : false;
 									break;
 								case "ePlatform":
 									ePlatform = Convert.ToInt32(paramArray[1]);
-									break;
-								case "eArchitecture":
-									eArchitecture = Convert.ToInt32(paramArray[1]);
 									break;
 								case "CUDAGenerateDebug":
 									CUDAGenerateDebug = Convert.ToInt32(paramArray[1]) != 0 ? true : false;
@@ -222,7 +224,7 @@ namespace Core
 									break;
 								case "threadMaxNum":
 									threadMaxNum = Convert.ToInt32(paramArray[1]);
-									break;
+									break;	
 								case "gridSize":
 									gridSize = Convert.ToDouble(paramArray[1]);
 									break;
@@ -253,33 +255,6 @@ namespace Core
 								case "structEleShape":
 									structEleShape = Convert.ToInt32(paramArray[1]);
 									break;
-								case "dbName":
-									dbName = paramArray[1];
-									break;
-								case "WeightOfEdgeFeature":
-									WeightOfEdgeFeature = Convert.ToDouble(paramArray[1]);
-									break;
-								case "rankingResultNum":
-									rankingResultNum = Convert.ToInt32(paramArray[1]);
-									break;
-								case "sqlDBHost":
-									sqlDBHost = paramArray[1];
-									break;
-								case "sqlDBUser":
-									sqlDBUser = paramArray[1];
-									break;
-								case "sqlDBPass":
-									sqlDBPass = paramArray[1];
-									break;
-								case "sqlDBName":
-									sqlDBName = paramArray[1];
-									break;
-								case "sqlQueryResultTableName":
-									sqlQueryResultTableName = paramArray[1];
-									break;
-								case "sqlQueryTableName":
-									sqlQueryTableName = paramArray[1];
-									break;
 								default:
 									break;
 							}
@@ -305,19 +280,16 @@ namespace Core
 			xyzClass.morIterNum = morIterNum;
 			xyzClass.structEleShape = (Emgu.CV.CvEnum.CV_ELEMENT_SHAPE)structEleShape;
 
-			DBRecord.annularNum = annularNum;
-			DBRecord.recordLength = DBRecord.sizeFeatureNum + DBRecord.featureDimension * annularNum;
-
 			//GPU加速
 			coreClass.threadMaxNum = threadMaxNum;
 
 			if (enableCUDA)
-				coreClass.Cudafy_initialization(ePlatform, CUDADeviceId, eArchitecture, CUDAGenerateDebug);
+				coreClass.Cudafy_initialization(ePlatform, CUDADeviceId, CUDAGenerateDebug);
 
-			//CPU核心限制
-			//coreClass.degreeOfParallelism = degreeOfParallelism;
-			//coreClass.parallelOptions = new System.Threading.Tasks.ParallelOptions();
-			//coreClass.parallelOptions.MaxDegreeOfParallelism = degreeOfParallelism;
+			//CPU加速
+			coreClass.degreeOfParallelism = degreeOfParallelism;
+			coreClass.parallelOptions = new System.Threading.Tasks.ParallelOptions();
+			coreClass.parallelOptions.MaxDegreeOfParallelism = degreeOfParallelism;
 
 
 			return true;

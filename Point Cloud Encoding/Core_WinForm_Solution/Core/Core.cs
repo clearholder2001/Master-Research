@@ -1499,7 +1499,7 @@ namespace Core
 			height = (int)Math.Ceiling((Math.Ceiling(yMax) - Math.Floor(yMin)) / gridSize) + (borderAdditionWidth * 2);
 
 			eye = new Vector3d(0, 0, zMax);
-			center = new Vector3d(0, 0, 0);
+			center = new Vector3d(0, 0, zMin);
 			up = new Vector3d(0, 1, 0);
 
 

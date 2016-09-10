@@ -40,6 +40,7 @@
 			this.loadPolygonalModelsFromListToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
 			this.generateAnnularFeatureToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
 			this.retrieveAndRankToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+			this.toolStripMenuItem1 = new System.Windows.Forms.ToolStripSeparator();
 			this.cancelToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
 			this.generateAnnularFeatureonlyForPointCloudToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
 			this.scheduleToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
@@ -73,7 +74,6 @@
 			this.comboBox1 = new System.Windows.Forms.ComboBox();
 			this.checkedListBox1 = new System.Windows.Forms.CheckedListBox();
 			this.button_removeAllPolygonalModel = new System.Windows.Forms.Button();
-			this.toolStripMenuItem1 = new System.Windows.Forms.ToolStripSeparator();
 			this.menuStrip1.SuspendLayout();
 			this.groupBox1.SuspendLayout();
 			((System.ComponentModel.ISupportInitialize)(this.pictureBox1)).BeginInit();
@@ -175,6 +175,11 @@
 			this.retrieveAndRankToolStripMenuItem.Size = new System.Drawing.Size(339, 22);
 			this.retrieveAndRankToolStripMenuItem.Text = "3. Retrieve and Rank";
 			this.retrieveAndRankToolStripMenuItem.Click += new System.EventHandler(this.retrieveAndRankToolStripMenuItem_Click);
+			// 
+			// toolStripMenuItem1
+			// 
+			this.toolStripMenuItem1.Name = "toolStripMenuItem1";
+			this.toolStripMenuItem1.Size = new System.Drawing.Size(336, 6);
 			// 
 			// cancelToolStripMenuItem
 			// 
@@ -479,11 +484,6 @@
 			this.button_removeAllPolygonalModel.Text = "Remove ALL";
 			this.button_removeAllPolygonalModel.UseVisualStyleBackColor = true;
 			this.button_removeAllPolygonalModel.Click += new System.EventHandler(this.button_removeAllPolygonalModel_Click);
-			// 
-			// toolStripMenuItem1
-			// 
-			this.toolStripMenuItem1.Name = "toolStripMenuItem1";
-			this.toolStripMenuItem1.Size = new System.Drawing.Size(336, 6);
 			// 
 			// Form1
 			// 

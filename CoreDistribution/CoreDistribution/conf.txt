@@ -1,33 +1,35 @@
-﻿# initPath Y:\data4\db
-# rootPath Y
+﻿initPath Y:\0
+rootPath Y:
 # targetPath Z
-# targetPath C:\Others\db_test
-
+targetPath C:\Others\db_test
 
 # initPath C:\Users\Yi-Chen\CloudStation\Debug
 # rootPath C:\Users\Yi-Chen\CloudStation\Debug
 # targetPath C:\Users\Yi-Chen\CloudStation\Debug
-
+startIndex 0
 
 # C:\Users\Yi-Chen\CloudStation\Debug
 # D:\Users\Yi-Chen\Desktop\debug
 # pathDirRegex .*\\[0-9][0-9a-z]$
 
-# pathDirRegex .*\\[b][0-9a-z]$
-
-# overWrite 0
-# fileMaxSize 536870912
-# sourceExtenstion obj00
+pathDirRegex .*\\[a][0-9]$
+overWrite 0
+gcFrequency 200
+fileMaxSize 536870912
+sourceExtenstion obj00
 outputExtension txt00
 saveRangeImage 1
+RunWithoutYes 0
+
+
+degreeOfParallelism 4
 
 
 enableCUDA 1
 ePlatform 2
-eArchitecture 306
 CUDAGenerateDebug 0
 CUDADeviceId 0
-threadMaxNum 64
+threadMaxNum 32
 
 
 gridSize 0.25
@@ -42,17 +44,11 @@ morIterNum 3
 structEleShape 0
 
 
-dbName All-979687-0525-f3.db
-WeightOfEdgeFeature 0.3
-rankingResultNum 100
-
-
-sqlDBHost 140.116.80.133
-sqlDBUser encoding
-sqlDBPass encoding
-sqlDBName model_retrieval
-sqlQueryResultTableName query_result
-sqlQueryTableName models_979687_0525
+# ePlatform
+# Auto 0
+# x86 1
+# x64 2
+# All 3
 
 
 # eArchitecture

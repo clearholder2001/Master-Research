@@ -1,63 +1,68 @@
-//using System;
+using System;
 using System.IO;
 using System.Collections.Generic;
 using OpenTK.Math;
 
 public class ObjMeshLoader
 {
-    public bool Load(ObjMesh mesh, string fileName)
-    {
-        try
-        {
-            using (StreamReader streamReader = new StreamReader(fileName))
-            {
-                Load(mesh, streamReader);
-                return true;
-            }
-        }
-        catch { return false; }
-    }
+	public bool Load(ObjMesh mesh, string fileName)
+	{
+		try
+		{
+			using (StreamReader streamReader = new StreamReader(fileName))
+			{
+				Load(mesh, streamReader);
+				return true;
+			}
+		}
+		catch { return false; }
+	}
 
-    char[] splitCharacters = new char[] { ' ' };
+	char[] splitCharacters = new char[] { ' ' };
 
-    List<Vector3> vertices;
-    List<Vector3> normals;
-    List<Vector2> texCoords;
-    Dictionary<ObjMesh.ObjVertex, int> objVerticesIndexDictionary;
-    List<ObjMesh.ObjVertex> objVertices;
-    List<ObjMesh.ObjTriangle> objTriangles;
-    List<ObjMesh.ObjQuad> objQuads;
+	List<Vector3> vertices;
+	List<Vector3> normals;
+	List<Vector2> texCoords;
+	Dictionary<ObjMesh.ObjVertex, int> objVerticesIndexDictionary;
+	List<ObjMesh.ObjVertex> objVertices;
+	List<ObjMesh.ObjTriangle> objTriangles;
+	List<ObjMesh.ObjQuad> objQuads;
 
 	void Load(ObjMesh mesh, TextReader textReader)
-    {
-        vertices = new List<Vector3>();
-        normals = new List<Vector3>();
-        texCoords = new List<Vector2>();
-        objVerticesIndexDictionary = new Dictionary<ObjMesh.ObjVertex, int>();
-        objVertices = new List<ObjMesh.ObjVertex>();
-        objTriangles = new List<ObjMesh.ObjTriangle>();
-        objQuads = new List<ObjMesh.ObjQuad>();
+	{
+		vertices = new List<Vector3>();
+		normals = new List<Vector3>();
+		texCoords = new List<Vector2>();
+		objVerticesIndexDictionary = new Dictionary<ObjMesh.ObjVertex, int>();
+		objVertices = new List<ObjMesh.ObjVertex>();
+		objTriangles = new List<ObjMesh.ObjTriangle>();
+		objQuads = new List<ObjMesh.ObjQuad>();
 
-        string line;
-        while ((line = textReader.ReadLine()) != null)
-        {
-            line = line.Trim(splitCharacters);
-            line = line.Replace("  ", " ");
+		string line;
+		while ((line = textReader.ReadLine()) != null)
+		{
+			line = line.Trim(splitCharacters);
+			line = line.Replace("  ", " ");
 
-            string[] parameters = line.Split(splitCharacters);
+			string[] parameters = line.Split(splitCharacters);
 
-            switch (parameters[0])
-            {
-                case "p": // Point
-                    break;
+			switch (parameters[0])
+			{
+				case "p": // Point
+					break;
 
-                case "v": // Vertex
-                    float x = float.Parse(parameters[1]);
-                    float y = float.Parse(parameters[2]);
-                    float z = float.Parse(parameters[3]);
-                    vertices.Add(new Vector3(x, y, z));
-                    break;
-				
+				case "v": // Vertex
+						  //float x = float.Parse(parameters[1]);
+						  //float y = float.Parse(parameters[2]);
+						  //float z = float.Parse(parameters[3]);
+						  //vertices.Add(new Vector3(x, y, z));
+					ObjMesh.ObjVertex objVertex = new ObjMesh.ObjVertex();
+					objVertex.Vertex.X = float.Parse(parameters[1]);
+					objVertex.Vertex.Y = float.Parse(parameters[2]);
+					objVertex.Vertex.Z = float.Parse(parameters[3]);
+					objVertices.Add(objVertex);
+					break;
+
 				/*
                 case "vt": // TexCoord
                     float u = float.Parse(parameters[1]);
@@ -73,98 +78,105 @@ public class ObjMeshLoader
                     break;
 				*/
 
-                case "f":
-                    switch (parameters.Length)
-                    {
-                        case 4:
-                            ObjMesh.ObjTriangle objTriangle = new ObjMesh.ObjTriangle();
-                            objTriangle.Index0 = ParseFaceParameter(parameters[1]);
-                            objTriangle.Index1 = ParseFaceParameter(parameters[2]);
-                            objTriangle.Index2 = ParseFaceParameter(parameters[3]);
-                            objTriangles.Add(objTriangle);
-                            break;
+				case "f":
+					switch (parameters.Length)
+					{
+						case 4:
+							ObjMesh.ObjTriangle objTriangle = new ObjMesh.ObjTriangle();
+							//objTriangle.Index0 = ParseFaceParameter(parameters[1]);
+							//objTriangle.Index1 = ParseFaceParameter(parameters[2]);
+							//objTriangle.Index2 = ParseFaceParameter(parameters[3]);
+							objTriangle.Index0 = int.Parse(parameters[1]) - 1;
+							objTriangle.Index1 = int.Parse(parameters[2]) - 1;
+							objTriangle.Index2 = int.Parse(parameters[3]) - 1;
+							objTriangles.Add(objTriangle);
+							break;
 
-                        case 5:
-                            ObjMesh.ObjQuad objQuad = new ObjMesh.ObjQuad();
-                            objQuad.Index0 = ParseFaceParameter(parameters[1]);
-                            objQuad.Index1 = ParseFaceParameter(parameters[2]);
-                            objQuad.Index2 = ParseFaceParameter(parameters[3]);
-                            objQuad.Index3 = ParseFaceParameter(parameters[4]);
-                            objQuads.Add(objQuad);
-                            break;
-                    }
-                    break;
-            }
-        }
+						case 5:
+							ObjMesh.ObjQuad objQuad = new ObjMesh.ObjQuad();
+							//objQuad.Index0 = ParseFaceParameter(parameters[1]);
+							//objQuad.Index1 = ParseFaceParameter(parameters[2]);
+							//objQuad.Index2 = ParseFaceParameter(parameters[3]);
+							//objQuad.Index3 = ParseFaceParameter(parameters[4]);
+							objQuad.Index0 = int.Parse(parameters[1]) - 1;
+							objQuad.Index1 = int.Parse(parameters[2]) - 1;
+							objQuad.Index2 = int.Parse(parameters[3]) - 1;
+							objQuad.Index3 = int.Parse(parameters[4]) - 1;
+							objQuads.Add(objQuad);
+							break;
+					}
+					break;
+			}
+		}
 
-        mesh.Vertices = objVertices.ToArray();
-        mesh.Triangles = objTriangles.ToArray();
-        mesh.Quads = objQuads.ToArray();
+		mesh.Vertices = objVertices.ToArray();
+		mesh.Triangles = objTriangles.ToArray();
+		mesh.Quads = objQuads.ToArray();
 
-        objVerticesIndexDictionary = null;
-        vertices = null;
-        normals = null;
-        texCoords = null;
-        objVertices = null;
-        objTriangles = null;
-        objQuads = null;
-    }
+		objVerticesIndexDictionary = null;
+		vertices = null;
+		normals = null;
+		texCoords = null;
+		objVertices = null;
+		objTriangles = null;
+		objQuads = null;
+	}
 
 	char[] faceParamaterSplitter = new char[] { '/' };
 	int ParseFaceParameter(string faceParameter)
-    {
-        Vector3 vertex = new Vector3();
-        Vector2 texCoord = new Vector2();
-        Vector3 normal = new Vector3();
+	{
+		Vector3 vertex = new Vector3();
+		Vector2 texCoord = new Vector2();
+		Vector3 normal = new Vector3();
 
-        string[] parameters = faceParameter.Split(faceParamaterSplitter);
+		string[] parameters = faceParameter.Split(faceParamaterSplitter);
 
-        int vertexIndex = int.Parse(parameters[0]);
-        if( vertexIndex < 0 ) vertexIndex = vertices.Count + vertexIndex;
-        else vertexIndex = vertexIndex -1;
-        vertex = vertices[vertexIndex];
+		int vertexIndex = int.Parse(parameters[0]);
+		if (vertexIndex < 0) vertexIndex = vertices.Count + vertexIndex;
+		else vertexIndex = vertexIndex - 1;
+		vertex = vertices[vertexIndex];
 
-        if (parameters.Length > 1)
-        {
-            int texCoordIndex = int.Parse(parameters[1]);
-            if (texCoordIndex < 0) texCoordIndex = texCoords.Count + texCoordIndex;
-            else texCoordIndex = texCoordIndex - 1;
-            texCoord = texCoords[texCoordIndex];
-        }
+		if (parameters.Length > 1)
+		{
+			int texCoordIndex = int.Parse(parameters[1]);
+			if (texCoordIndex < 0) texCoordIndex = texCoords.Count + texCoordIndex;
+			else texCoordIndex = texCoordIndex - 1;
+			texCoord = texCoords[texCoordIndex];
+		}
 
-        if (parameters.Length > 2)
-        {
-            int normalIndex = int.Parse(parameters[2]);
-            if (normalIndex < 0) normalIndex = normals.Count + normalIndex;
-            else normalIndex = normalIndex - 1;
-            normal = normals[normalIndex];
-        }
+		if (parameters.Length > 2)
+		{
+			int normalIndex = int.Parse(parameters[2]);
+			if (normalIndex < 0) normalIndex = normals.Count + normalIndex;
+			else normalIndex = normalIndex - 1;
+			normal = normals[normalIndex];
+		}
 
-        return FindOrAddObjVertex(ref vertex, ref texCoord, ref normal);
-    }
+		return FindOrAddObjVertex(ref vertex, ref texCoord, ref normal);
+	}
 
 	int FindOrAddObjVertex(ref Vector3 vertex, ref Vector2 texCoord, ref Vector3 normal)
-    {
-        ObjMesh.ObjVertex newObjVertex = new ObjMesh.ObjVertex();
-        newObjVertex.Vertex = vertex;
-        newObjVertex.TexCoord = texCoord;
-        newObjVertex.Normal = normal;
-
+	{
+		ObjMesh.ObjVertex newObjVertex = new ObjMesh.ObjVertex();
+		newObjVertex.Vertex = vertex;
+		newObjVertex.TexCoord = texCoord;
+		newObjVertex.Normal = normal;
+		/*
 		objVertices.Add(newObjVertex);
 		return objVertices.Count - 1;
-
-		/*
-		int index;
-        if (objVerticesIndexDictionary.TryGetValue(newObjVertex, out index))
-        {
-            return index;
-        }
-        else
-        {
-            objVertices.Add(newObjVertex);
-            objVerticesIndexDictionary[newObjVertex] = objVertices.Count - 1;
-            return objVertices.Count - 1;
-        }
 		*/
-    }
+
+		int index;
+		if (objVerticesIndexDictionary.TryGetValue(newObjVertex, out index))
+		{
+			return index;
+		}
+		else
+		{
+			objVertices.Add(newObjVertex);
+			objVerticesIndexDictionary[newObjVertex] = objVertices.Count - 1;
+			return objVertices.Count - 1;
+		}
+
+	}
 }

@@ -1583,7 +1583,7 @@ namespace Core
 
 
 			eye = new Vector3d(0, 0, zMax);
-			center = new Vector3d(0, 0, 0);
+			center = new Vector3d(0, 0, zMin);
 			up = new Vector3d(0, 1, 0);
 
 
@@ -1649,6 +1649,13 @@ namespace Core
 					}
 				}
 				);
+
+
+				//檢查data2DMask是否全部為false
+				int data2DMaskTrueCount = Enumerable.Range(0, width * height).AsParallel().Where(i => data2DMask[i % width, i / width] == true).Count();
+				if (data2DMaskTrueCount <= 0)
+					return false;
+
 
 				CalAvg();
 
@@ -1864,6 +1871,14 @@ namespace Core
 				}
 			}
 			);
+
+
+
+			//檢查data2DMask是否全部為false
+			int data2DMaskTrueCount = Enumerable.Range(0, width * height).AsParallel().Where(i => data2DMask[i % width, i / width] == true).Count();
+			if (data2DMaskTrueCount <= 0)
+				return false;
+
 
 			CalAvg();
 

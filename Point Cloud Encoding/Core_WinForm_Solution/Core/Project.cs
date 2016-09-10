@@ -48,12 +48,12 @@ namespace Core
 			//Set_gridSize();
 			//Set_annularNum(10);
 
-			parameter[(int)parameterName.Grid_Size] = 0.1;
-			parameter[(int)parameterName.Annular_Number] = 20;
-			parameter[(int)parameterName.LoG_Laplacian_Aperture] = 7;
+			parameter[(int)parameterName.Grid_Size] = 0.25;
+			parameter[(int)parameterName.Annular_Number] = 30;
+			parameter[(int)parameterName.LoG_Laplacian_Aperture] = 3;
 			parameter[(int)parameterName.LoG_Gaussian_Aperture] = 7;
 			parameter[(int)parameterName.Eigen_Feature_Diameter_Multiple] = 4;
-			parameter[(int)parameterName.Structure_Element_Size] = 5;
+			parameter[(int)parameterName.Structure_Element_Size] = 7;
 			parameter[(int)parameterName.Morphology_Iteration_Number] = 3;
 			parameter[(int)parameterName.Display_Center] = 0;
 			parameter[(int)parameterName.Structure_Element_Shape] = (double)Emgu.CV.CvEnum.CV_ELEMENT_SHAPE.CV_SHAPE_RECT;

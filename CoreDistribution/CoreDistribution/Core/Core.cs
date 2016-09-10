@@ -94,12 +94,17 @@ namespace Core
 		public static bool ifDisplayCenter;
 		public static int borderAdditionWidth;
 		public static int thumbnailImgMaxSize;
+		public static bool generateImage;
 
 		public static GPGPU gpu { get; private set; }
 		public static CudafyModule km { get; private set; }
 		public static bool cudaReady = false;
-		public const int threadMaxNum = 32;
+		public static int threadMaxNum { get; set; }
 		//public static Queue<byte> cudaStreamQueue { get; private set; }
+
+		public static int degreeOfParallelism { get; set; }
+		public static ParallelOptions parallelOptions { get; set; }
+
 
 
 
@@ -186,15 +191,78 @@ namespace Core
 			return true;
 		}
 
+		public bool SaveResult(string path, bool overwrite)
+		{
+			if (File.Exists(path))
+			{
+				if (!overwrite)
+				{
+					return false;
+				}
+				else
+				{
+					File.Delete(path);
+				}
+			}
+
+
+			//default: overwrite is false
+			Directory.CreateDirectory(Path.GetDirectoryName(path));
+			using (StreamWriter sw = new StreamWriter(path, false))
+			{
+				sw.WriteLine(string.Format("{0:0.######}", zRange));
+				sw.WriteLine(string.Format("{0:0.######}", zAvg));
+				sw.WriteLine(string.Format("{0:0.######}", totalArea));
+				sw.WriteLine(string.Format("{0:0.######}", totalVol));
+				sw.WriteLine(string.Format("{0:0.######}", radiusMax));
+
+				double sum;
+				for (int i = 0; i < featureDimension; i++)
+				{
+					sum = Enumerable.Range(0, annularNum).AsParallel().WithDegreeOfParallelism(degreeOfParallelism).Select(a => annularFeature[i, a]).Sum();
+
+					for (int j = 0; j < annularNum; j++)
+					{
+						if (sum != 0.0)
+							sw.WriteLine(string.Format("{0:0.######}", annularFeature[i, j] / sum));
+						else
+							sw.WriteLine(string.Format("{0:0.######}", 0.0));
+					}
+				}
+
+				//輸出原始數值
+				/*
+				for (int i = 0; i < featureDimension; i++)
+				{
+					for (int j = 0; j < annularNum; j++)
+					{
+						sw.WriteLine(string.Format("{0:0.######}", annularFeature[i, j]));
+					}
+				}
+				*/
+
+				return true;
+			}
+		}
+
+		public void InsertValue(string path)
+		{
+			List<string> stringList = File.ReadAllLines(path).ToList();
+			if (stringList.Count == 105)
+				return;
+
+			stringList.Insert(0, string.Format("{0:0.######}", zRange));
+			File.WriteAllLines(path, stringList);
+		}
 
 		private void CalArea()
 		{
-			totalArea = Enumerable.Range(0, width * height).AsParallel().Where(i => data2DMask[i % width, i / width] == true).Count() * Math.Pow(gridSize, 2);
+			totalArea = Enumerable.Range(0, width * height).AsParallel().WithDegreeOfParallelism(degreeOfParallelism).Where(i => data2DMask[i % width, i / width] == true).Count() * Math.Pow(gridSize, 2);
 		}
 
 		private void CalVol()
 		{
-			totalVol = Enumerable.Range(0, width * height).AsParallel().Where(i => data2DMask[i % width, i / width] == true).Select(i => data2D[i % width, i / width, (byte)feature.Height]).Sum();
+			totalVol = Enumerable.Range(0, width * height).AsParallel().WithDegreeOfParallelism(degreeOfParallelism).Where(i => data2DMask[i % width, i / width] == true).Select(i => data2D[i % width, i / width, (byte)feature.Height]).Sum();
 		}
 
 		private void Cal2DFeature()
@@ -213,18 +281,20 @@ namespace Core
 				//Canny
 				//Image<Gray, byte> emguCannyImg = emguImg.Canny(10.0, 15.0);
 
-				//Loplacian of Gaussian (LoG)
-				Image<Gray, float> emguLoGImg = emguImg.SmoothGaussian(gaussianAperture).Laplace(laplacianAperture);
 
-				Parallel.For(0, width - 1, i=>
-				//for (int i = 0; i < width; i++)
+				//Loplacian of Gaussian (LoG)
+				using (Image<Gray, float> emguLoGImg = emguImg.SmoothGaussian(gaussianAperture).Laplace(laplacianAperture))
 				{
-					for (int j = 0; j < height; j++)
+					Parallel.For(0, width - 1, parallelOptions, i=>
+					//for (int i = 0; i < width; i++)
 					{
-						data2D[i, j, 1] = Math.Abs(emguLoGImg.Data[j, i, (byte)feature.Height]);
+						for (int j = 0; j < height; j++)
+						{
+							data2D[i, j, 1] = Math.Abs(emguLoGImg.Data[j, i, (byte)feature.Height]);
+						}
 					}
+					);
 				}
-				);
 			}
 
 
@@ -236,7 +306,7 @@ namespace Core
 			}
 			else
 			{
-				Parallel.For(0, width - 1, i =>
+				Parallel.For(0, width - 1, parallelOptions, i =>
 				//for (int i = 0; i < width; i++)
 				{
 					for (int j = 0; j < height; j++)
@@ -262,7 +332,7 @@ namespace Core
 				byte[,] data2DMask = new byte[width, height];
 				double[,,] eigenFeature = new double[width, height, 3];
 
-				Parallel.For(0, width - 1, i =>
+				Parallel.For(0, width - 1, parallelOptions, i =>
 				//for (int i = 0; i < width; i++)
 				{
 					for (int j = 0; j < height; j++)
@@ -321,7 +391,7 @@ namespace Core
 				gpu.Free(dev_eigenFeature);
 
 
-				Parallel.For(0, width - 1, i =>
+				Parallel.For(0, width - 1, parallelOptions, i =>
 				//for (int i = 0; i < width; i++)
 				{
 					for (int j = 0; j < height; j++)
@@ -341,7 +411,7 @@ namespace Core
 
 
 
-				Parallel.For(0, width - 1, i =>
+				Parallel.For(0, width - 1, parallelOptions, i =>
 				//for (int i = 0; i < width; i++)
 				{
 					for (int j = 0; j < height; j++)
@@ -468,7 +538,7 @@ namespace Core
 
 		private void CalAnnularFeature()
 		{
-			radiusMax = Enumerable.Range(0, width * height).AsParallel().Where(i => data2DMask[i % width, i / width] == true).Select(i => Math.Sqrt(Math.Pow((i % width) - xAvg, 2) + Math.Pow((i / width) - yAvg, 2))).Max() * gridSize;
+			radiusMax = Enumerable.Range(0, width * height).AsParallel().WithDegreeOfParallelism(degreeOfParallelism).Where(i => data2DMask[i % width, i / width] == true).Select(i => Math.Sqrt(Math.Pow((i % width) - xAvg, 2) + Math.Pow((i / width) - yAvg, 2))).Max() * gridSize;
 
 			double annularRangeDistance = radiusMax / (double)annularNum;
 
@@ -491,7 +561,7 @@ namespace Core
 
 			double[,] data2DDistance = new double[width, height];
 
-			Parallel.For(0, width - 1, i =>
+			Parallel.For(0, width - 1, parallelOptions, i =>
 			//for (int i = 0; i < width; i++)
 			{
 				for (int j = 0; j < height; j++)
@@ -540,7 +610,7 @@ namespace Core
 			);
 
 			//apply annular weight
-			Parallel.For(0, coreClass.featureDimension - 1, i =>
+			Parallel.For(0, coreClass.featureDimension - 1, parallelOptions, i =>
 			//for (int i = 0; i < coreClass.featureDimension; i++)
 			{
 				for (int j = 1; j <= coreClass.annularNum; j++)
@@ -565,10 +635,10 @@ namespace Core
 			}
 
 			//計算中心點(z因為要算中心而不是表面，所以要除以2)
-			double zSum = Enumerable.Range(0, width * height).AsParallel().Select(i => data2D[i % width, i / width, (byte)feature.Height]).Sum();
-			xAvg = (int)Math.Round(Enumerable.Range(0, width * height).AsParallel().Select(i => data2DAvg[i % width, i / width, 0]).Sum() / zSum) - 1;
-			yAvg = (int)Math.Round(Enumerable.Range(0, width * height).AsParallel().Select(i => data2DAvg[i % width, i / width, 1]).Sum() / zSum) - 1;
-			zAvg = (Enumerable.Range(0, width * height).AsParallel().Select(i => data2D[i % width, i / width, (byte)feature.Height]).Sum() / 2) / Enumerable.Range(0, width * height).Where(i => data2DMask[i % width, i / width] == true).Count();
+			double zSum = Enumerable.Range(0, width * height).AsParallel().WithDegreeOfParallelism(degreeOfParallelism).Select(i => data2D[i % width, i / width, (byte)feature.Height]).Sum();
+			xAvg = (int)Math.Round(Enumerable.Range(0, width * height).AsParallel().WithDegreeOfParallelism(degreeOfParallelism).Select(i => data2DAvg[i % width, i / width, 0]).Sum() / zSum) - 1;
+			yAvg = (int)Math.Round(Enumerable.Range(0, width * height).AsParallel().WithDegreeOfParallelism(degreeOfParallelism).Select(i => data2DAvg[i % width, i / width, 1]).Sum() / zSum) - 1;
+			zAvg = (Enumerable.Range(0, width * height).AsParallel().WithDegreeOfParallelism(degreeOfParallelism).Select(i => data2D[i % width, i / width, (byte)feature.Height]).Sum() / 2) / Enumerable.Range(0, width * height).Where(i => data2DMask[i % width, i / width] == true).Count();
 		}
 
 		protected void DisplayCenter()
@@ -582,19 +652,14 @@ namespace Core
 			}
 		}
 
-		public static void Cudafy_initialization()
+		public static void Cudafy_initialization(int ePlatform, int CUDADeviceId, bool CUDAGenerateDebug)
 		{
 			try
 			{
-				km = CudafyTranslator.Cudafy(ePlatform.x64, eArchitecture.sm_50);
-				//km = CudafyTranslator.Cudafy(ePlatform.x64, eArchitecture.sm_30);
+				gpu = CudafyHost.GetDevice(eGPUType.Cuda, CUDADeviceId);
 
-				km.GenerateDebug = true;
-
-				CudafyModes.Target = eGPUType.Cuda;
-				CudafyModes.DeviceId = 0;
-
-				gpu = CudafyHost.GetDevice(CudafyModes.Target, CudafyModes.DeviceId);
+				CudafyTranslator.GenerateDebug = CUDAGenerateDebug;
+				km = CudafyTranslator.Cudafy((ePlatform)ePlatform, gpu.GetArchitecture());
 
 				gpu.UnloadModules();
 				gpu.FreeAll();
@@ -1190,6 +1255,10 @@ namespace Core
 			int width = data2D.GetLength(0);
 			int height = data2D.GetLength(1);
 
+			if (i < 0 || i > width - 1)
+				return;
+			if (j < 0 || j > height - 1)
+				return;
 
 			//int eigenFeatureDiameterMultiple = 4;
 			//float gridSize = 0.1f;
@@ -1459,8 +1528,23 @@ namespace Core
 	//derived from coreClass
 	public class objClass : coreClass
 	{
+		private static GameWindow window;
+
 		public objClass(string fileName) : base(fileName)
 		{
+		}
+
+		public static bool InitOpenGL()
+		{
+			try
+			{
+				window = new GameWindow(1, 1);
+				return true;
+			}
+			catch (Exception)
+			{
+				return false;
+			}
 		}
 
 		public override bool GenerateRangeImage()
@@ -1481,40 +1565,79 @@ namespace Core
 			}
 
 
+
+			if (model == null || model.Vertices == null || model.Vertices.Length == 0)
+			{
+				return false;
+			}
+
+
+
 			ObjMesh.ObjVertex[] v = model.Vertices;
 
-			xMax = Enumerable.Range(0, v.Length).AsParallel().Select(i => v[i].Vertex.X).Max();
-			xMin = Enumerable.Range(0, v.Length).AsParallel().Select(i => v[i].Vertex.X).Min();
-			yMax = Enumerable.Range(0, v.Length).AsParallel().Select(i => v[i].Vertex.Y).Max();
-			yMin = Enumerable.Range(0, v.Length).AsParallel().Select(i => v[i].Vertex.Y).Min();
-			zMax = Enumerable.Range(0, v.Length).AsParallel().Select(i => v[i].Vertex.Z).Max();
-			zMin = Enumerable.Range(0, v.Length).AsParallel().Select(i => v[i].Vertex.Z).Min();
+			xMax = Enumerable.Range(0, v.Length).AsParallel().WithDegreeOfParallelism(degreeOfParallelism).Select(i => v[i].Vertex.X).Max();
+			xMin = Enumerable.Range(0, v.Length).AsParallel().WithDegreeOfParallelism(degreeOfParallelism).Select(i => v[i].Vertex.X).Min();
+			yMax = Enumerable.Range(0, v.Length).AsParallel().WithDegreeOfParallelism(degreeOfParallelism).Select(i => v[i].Vertex.Y).Max();
+			yMin = Enumerable.Range(0, v.Length).AsParallel().WithDegreeOfParallelism(degreeOfParallelism).Select(i => v[i].Vertex.Y).Min();
+			zMax = Enumerable.Range(0, v.Length).AsParallel().WithDegreeOfParallelism(degreeOfParallelism).Select(i => v[i].Vertex.Z).Max();
+			zMin = Enumerable.Range(0, v.Length).AsParallel().WithDegreeOfParallelism(degreeOfParallelism).Select(i => v[i].Vertex.Z).Min();
 			zMaxAdj = zMax - zMin;
 			zMinAdj = zMin - zMin;
 			zRange = zMax - zMin;
 
 
+			double dWidth = (xMax - xMin) / gridSize;
+			double dHeight = (yMax - yMin) / gridSize;
 
-			width = (int)Math.Ceiling((Math.Ceiling(xMax) - Math.Floor(xMin)) / gridSize) + (borderAdditionWidth * 2);
-			height = (int)Math.Ceiling((Math.Ceiling(yMax) - Math.Floor(yMin)) / gridSize) + (borderAdditionWidth * 2);
+
+			//out of size
+			if (dWidth <= 0 || dHeight <= 0)
+			{
+				return false;
+			}
+			else if (dWidth * dHeight > 3000 * 3000)//if too large, resize
+			{
+				double aspectRatio = dWidth / dHeight;
+
+				if (aspectRatio >= 1)
+				{
+					width = 3000;
+					height = (int)Math.Ceiling(3000 / aspectRatio);
+				}
+				else
+				{
+					width = (int)Math.Ceiling(3000 * aspectRatio);
+					height = 3000;
+				}
+
+				width += (borderAdditionWidth * 2);
+				height += (borderAdditionWidth * 2);
+			}
+			else
+			{
+				width = (int)Math.Ceiling((Math.Ceiling(xMax) - Math.Floor(xMin)) / gridSize) + (borderAdditionWidth * 2);
+				height = (int)Math.Ceiling((Math.Ceiling(yMax) - Math.Floor(yMin)) / gridSize) + (borderAdditionWidth * 2);
+			}
+
+
 
 			eye = new Vector3d(0, 0, zMax);
-			center = new Vector3d(0, 0, 0);
+			center = new Vector3d(0, 0, zMin);
 			up = new Vector3d(0, 1, 0);
 
 
 
-			using (GameWindow window = new GameWindow(1, 1))
-			{
-				uint FboHandle;
+			//using (GameWindow window = new GameWindow(1, 1))
+			//{
+				uint FrameBuffer;
 				uint DepthRenderbuffer;
 
 				GL.Ext.GenRenderbuffers(1, out DepthRenderbuffer);
 				GL.Ext.BindRenderbuffer(RenderbufferTarget.RenderbufferExt, DepthRenderbuffer);
 				GL.Ext.RenderbufferStorage(RenderbufferTarget.RenderbufferExt, (RenderbufferStorage)All.DepthComponent32, width, height);
 
-				GL.Ext.GenFramebuffers(1, out FboHandle);
-				GL.Ext.BindFramebuffer(FramebufferTarget.FramebufferExt, FboHandle);
+				GL.Ext.GenFramebuffers(1, out FrameBuffer);
+				GL.Ext.BindFramebuffer(FramebufferTarget.FramebufferExt, FrameBuffer);
 				GL.Ext.FramebufferRenderbuffer(FramebufferTarget.FramebufferExt, FramebufferAttachment.DepthAttachmentExt, RenderbufferTarget.RenderbufferExt, DepthRenderbuffer);
 
 				GL.Enable(EnableCap.DepthTest);
@@ -1548,11 +1671,15 @@ namespace Core
 				GL.ReadPixels(0, 0, width, height, PixelFormat.DepthComponent, PixelType.Float, pixels);
 
 
+				//free memory
+				GL.DeleteFramebuffer(FrameBuffer);
+				GL.DeleteRenderbuffer(DepthRenderbuffer);
+
 
 				for (int i = 0; i < pixels.Length; i++)
 					pixels[i] = 1.0f - pixels[i];
 
-				Parallel.For(0, width - 1, i =>
+				Parallel.For(0, width - 1, parallelOptions, i =>
 				//for (int i = 0; i < width; i++)
 				{
 					for (int j = 0; j < height; j++)
@@ -1566,6 +1693,13 @@ namespace Core
 				}
 				);
 
+
+				//檢查data2DMask是否全部為false
+				int data2DMaskTrueCount = Enumerable.Range(0, width * height).AsParallel().WithDegreeOfParallelism(degreeOfParallelism).Where(i => data2DMask[i % width, i / width] == true).Count();
+				if (data2DMaskTrueCount <= 0)
+					return false;
+
+
 				CalAvg();
 
 				if (ifDisplayCenter)
@@ -1573,24 +1707,30 @@ namespace Core
 					DisplayCenter();
 				}
 
-				rangeImg = utilClass.Data2Bitmap(data2D, 0);
 
-				int thumbnailImgWidth, thumbnailImgHeight;
-				if (width >= height)
+				if (generateImage)
 				{
-					thumbnailImgWidth = thumbnailImgMaxSize;
-					thumbnailImgHeight = (int)((double)height / ((double)width / (double)thumbnailImgMaxSize));
-				}
-				else
-				{
-					thumbnailImgWidth = (int)((double)width / ((double)height / (double)thumbnailImgMaxSize));
-					thumbnailImgHeight = thumbnailImgMaxSize;
-				}
-				rangeThumbnailImg = (Bitmap)rangeImg.GetThumbnailImage(thumbnailImgWidth, thumbnailImgHeight, null, IntPtr.Zero);
+					rangeImg = utilClass.Data2Bitmap(data2D, 0);
 
+					int thumbnailImgWidth, thumbnailImgHeight;
+					if (width >= height)
+					{
+						thumbnailImgWidth = thumbnailImgMaxSize;
+						thumbnailImgHeight = (int)((double)height / ((double)width / (double)thumbnailImgMaxSize));
+					}
+					else
+					{
+						thumbnailImgWidth = (int)((double)width / ((double)height / (double)thumbnailImgMaxSize));
+						thumbnailImgHeight = thumbnailImgMaxSize;
+					}
+					rangeThumbnailImg = (Bitmap)rangeImg.GetThumbnailImage(thumbnailImgWidth, thumbnailImgHeight, null, IntPtr.Zero);
+				}
+
+
+				model.Dispose();
 
 				return true;
-			}
+			//}
 		}
 	}
 
@@ -1598,7 +1738,7 @@ namespace Core
 	public class xyzClass : coreClass
 	{
 		public static int structEleSize { get; set; }
-		public static int MorIterNum { get; set; }
+		public static int morIterNum { get; set; }
 		public static Emgu.CV.CvEnum.CV_ELEMENT_SHAPE structEleShape { get; set; }
 
 		private struct PointCloud
@@ -1644,29 +1784,48 @@ namespace Core
 			}
 
 
+			if (pcArray.GetLength(0) == 0)
+			{
+				return false;
+			}
+
+
 
 			//找出bounding box的範圍
-			xMax = Enumerable.Range(0, pcArray.GetLength(0)).AsParallel().Select(i => pcArray[i, 0]).Max();
-			xMin = Enumerable.Range(0, pcArray.GetLength(0)).AsParallel().Select(i => pcArray[i, 0]).Min();
-			yMax = Enumerable.Range(0, pcArray.GetLength(0)).AsParallel().Select(i => pcArray[i, 1]).Max();
-			yMin = Enumerable.Range(0, pcArray.GetLength(0)).AsParallel().Select(i => pcArray[i, 1]).Min();
-			zMax = Enumerable.Range(0, pcArray.GetLength(0)).AsParallel().Select(i => pcArray[i, 2]).Max();
-			zMin = Enumerable.Range(0, pcArray.GetLength(0)).AsParallel().Select(i => pcArray[i, 2]).Min();
+			xMax = Enumerable.Range(0, pcArray.GetLength(0)).AsParallel().WithDegreeOfParallelism(degreeOfParallelism).Select(i => pcArray[i, 0]).Max();
+			xMin = Enumerable.Range(0, pcArray.GetLength(0)).AsParallel().WithDegreeOfParallelism(degreeOfParallelism).Select(i => pcArray[i, 0]).Min();
+			yMax = Enumerable.Range(0, pcArray.GetLength(0)).AsParallel().WithDegreeOfParallelism(degreeOfParallelism).Select(i => pcArray[i, 1]).Max();
+			yMin = Enumerable.Range(0, pcArray.GetLength(0)).AsParallel().WithDegreeOfParallelism(degreeOfParallelism).Select(i => pcArray[i, 1]).Min();
+			zMax = Enumerable.Range(0, pcArray.GetLength(0)).AsParallel().WithDegreeOfParallelism(degreeOfParallelism).Select(i => pcArray[i, 2]).Max();
+			zMin = Enumerable.Range(0, pcArray.GetLength(0)).AsParallel().WithDegreeOfParallelism(degreeOfParallelism).Select(i => pcArray[i, 2]).Min();
 			zMaxAdj = zMax - zMin;
 			zMinAdj = zMin - zMin;
 			zRange = zMax - zMin;
 
-			//計算range image的長寬
-			width = (int)Math.Ceiling((Math.Ceiling(xMax) - Math.Floor(xMin)) / gridSize) + (borderAdditionWidth * 2);
-			height = (int)Math.Ceiling((Math.Ceiling(yMax) - Math.Floor(yMin)) / gridSize) + (borderAdditionWidth * 2);
 
+
+			double dWidth = (xMax - xMin) / gridSize;
+			double dHeight = (yMax - yMin) / gridSize;
+
+
+			//out of size
+			if (dWidth <= 0 || dHeight <= 0)
+			{
+				return false;
+			}
+			else
+			{
+				//計算range image的長寬
+				width = (int)Math.Ceiling((Math.Ceiling(xMax) - Math.Floor(xMin)) / gridSize) + (borderAdditionWidth * 2);
+				height = (int)Math.Ceiling((Math.Ceiling(yMax) - Math.Floor(yMin)) / gridSize) + (borderAdditionWidth * 2);
+			}
 
 
 			//宣告range image的z值最大的點雲陣列
 			PointCloud[,] zMaxArray = new PointCloud[width, height];
 
 			//初始化zMaxArray
-			Parallel.For(0, width - 1, i =>
+			Parallel.For(0, width - 1, parallelOptions, i =>
 			//for (int i = 0; i < width; i++)
 			{
 				for (int j = 0; j < height; j++)
@@ -1699,7 +1858,7 @@ namespace Core
 			//xyz2dData初始化並填值
 			data2D = new double[width, height, featureDimension];
 			data2DMask = new bool[width, height];
-			Parallel.For(0, width - 1, i =>
+			Parallel.For(0, width - 1, parallelOptions, i =>
 			//for (int i = 0; i < width; i++)
 			{
 				for (int j = 0; j < height; j++)
@@ -1714,7 +1873,7 @@ namespace Core
 			//EmguCV的Morphology處理
 			using (Image<Gray, Double> emguImg = new Image<Gray, Double>(width, height))
 			{
-				Parallel.For(0, width - 1, i =>
+				Parallel.For(0, width - 1, parallelOptions, i =>
 				//for (int i = 0; i < width; i++)
 				{
 					for (int j = 0; j < height; j++)
@@ -1726,10 +1885,10 @@ namespace Core
 
 
 				StructuringElementEx StructEle = new StructuringElementEx(structEleSize, structEleSize, (structEleSize - 1) / 2, (structEleSize - 1) / 2, structEleShape);
-				CvInvoke.cvDilate(emguImg, emguImg, StructEle, MorIterNum);
-				CvInvoke.cvErode(emguImg, emguImg, StructEle, MorIterNum);
+				CvInvoke.cvDilate(emguImg, emguImg, StructEle, morIterNum);
+				CvInvoke.cvErode(emguImg, emguImg, StructEle, morIterNum);
 
-				Parallel.For(0, width - 1, i =>
+				Parallel.For(0, width - 1, parallelOptions, i =>
 				//for (int i = 0; i < width; i++)
 				{
 					for (int j = 0; j < height; j++)
@@ -1740,7 +1899,7 @@ namespace Core
 				);
 			}
 
-			Parallel.For(0, width - 1, i =>
+			Parallel.For(0, width - 1, parallelOptions, i =>
 			//for (int i = 0; i < width; i++)
 			{
 				for (int j = 0; j < height; j++)
@@ -1753,6 +1912,14 @@ namespace Core
 			}
 			);
 
+
+			//檢查data2DMask是否全部為false
+			int data2DMaskTrueCount = Enumerable.Range(0, width * height).AsParallel().WithDegreeOfParallelism(degreeOfParallelism).Where(i => data2DMask[i % width, i / width] == true).Count();
+			if (data2DMaskTrueCount <= 0)
+				return false;
+
+
+
 			CalAvg();
 
 			if (ifDisplayCenter)
@@ -1760,20 +1927,26 @@ namespace Core
 				DisplayCenter();
 			}
 
-			rangeImg = utilClass.Data2Bitmap(data2D, 0);
 
-			int thumbnailImgWidth, thumbnailImgHeight;
-			if (width >= height)
+			if (generateImage)
 			{
-				thumbnailImgWidth = thumbnailImgMaxSize;
-				thumbnailImgHeight = (int)((double)height / ((double)width / (double)thumbnailImgMaxSize));
+				rangeImg = utilClass.Data2Bitmap(data2D, 0);
+
+				int thumbnailImgWidth, thumbnailImgHeight;
+				if (width >= height)
+				{
+					thumbnailImgWidth = thumbnailImgMaxSize;
+					thumbnailImgHeight = (int)((double)height / ((double)width / (double)thumbnailImgMaxSize));
+				}
+				else
+				{
+					thumbnailImgWidth = (int)((double)width / ((double)height / (double)thumbnailImgMaxSize));
+					thumbnailImgHeight = thumbnailImgMaxSize;
+				}
+				rangeThumbnailImg = (Bitmap)rangeImg.GetThumbnailImage(thumbnailImgWidth, thumbnailImgHeight, null, IntPtr.Zero);
 			}
-			else
-			{
-				thumbnailImgWidth = (int)((double)width / ((double)height / (double)thumbnailImgMaxSize));
-				thumbnailImgHeight = thumbnailImgMaxSize;
-			}
-			rangeThumbnailImg = (Bitmap)rangeImg.GetThumbnailImage(thumbnailImgWidth, thumbnailImgHeight, null, IntPtr.Zero);
+
+
 
 			return true;
 		}

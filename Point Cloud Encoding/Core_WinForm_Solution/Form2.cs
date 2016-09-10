@@ -86,7 +86,8 @@ namespace Core_WinForm_Solution
 		private void imageBox1_DoubleClick(object sender, EventArgs e)
 		{
 			SaveFileDialog sfd = new SaveFileDialog();
-			sfd.Filter = "bmp files (*.bmp)|*.bmp";
+			//sfd.Filter = "bmp files (*.bmp)|*.bmp";
+			sfd.Filter = "tif files (*.tif)|*.tif";
 			if (sfd.ShowDialog() == DialogResult.OK)
 			{
 				imageBox1.Image.Save(sfd.FileName);
