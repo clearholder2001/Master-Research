@@ -1,6 +1,8 @@
 # Master-Research
 Image-based Airborne LiDAR Point Cloud Encoding for 3D Building Model Retrieval  
-*National Cheng Kung University, Department of Geomatics, Taiwan*
+*National Cheng Kung University, Department of Geomatics, Taiwan*  
+
+![image](https://github.com/clearholder2001/Master-Research/blob/feat/enhance_readme/Screenshot/web_main.png)
 
 # Purpose
 This project introduces a 3D model retrieval method using airborne LiDAR point clouds as input queries, which
