@@ -1,0 +1,24 @@
+iority: optional
+Section: kernel
+Installed-Size: 32430
+Maintainer: Ubuntu Kernel Team <kernel-team@lists.ubuntu.com>
+Architecture: i386
+Source: linux
+Version: 3.13.0-96.143
+Provides: fuse-module, ivtv-modules, kvm-api-4, linux-image, linux-image-3.0, redhat-cluster-modules
+Depends: initramfs-tools (>= 0.36ubuntu6), module-init-tools (>= 3.3-pre11-4ubuntu3)
+Pre-Depends: dpkg (>= 1.10.24)
+Recommends: grub-pc | grub-efi-ia32 | grub | lilo (>= 19.1)
+Suggests: fdutils, linux-doc-3.13.0 | linux-source-3.13.0, linux-tools, linux-headers-3.13.0-96-generic
+Conflicts: hotplug (<< 0.0.20040105-1)
+Filename: pool/main/l/linux/linux-image-3.13.0-96-generic_3.13.0-96.143_i386.deb
+Size: 14766340
+MD5sum: cd810f7220fd4eb12aa9a190536cbf05
+SHA1: 10f2d486671f5fd9269f6c61c7ae56b4bf0bcd57
+SHA256: 1bcc14df9a1c7efb9132f29810289485c8d83099e018a2e0b15801c563276eea
+Description: Linux kernel image for version 3.13.0 on 32 bit x86 SMP
+Description-md5: 0bbcc82b16ba6f0f5ba74a7f4e44756a
+Bugs: https://bugs.launchpad.net/ubuntu/+filebug
+Origin: Ubuntu
+
+Packa

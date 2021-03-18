@@ -1,0 +1,25 @@
+.0.20040105-1)
+Filename: pool/main/l/linux-lts-utopic/linux-image-3.16.0-26-lowlatency_3.16.0-26.35~14.04.1_i386.deb
+Size: 53439278
+MD5sum: c3614142788d996e66f2d4f8f39182d6
+SHA1: 50c111d689dafea656582f3d3dd8f18bd1ce573a
+SHA256: 404f566ce16c6552a3575e2e88ca05f1d597d442f4700f91308be702f2000fb4
+Description: Linux kernel image for version 3.16.0 on 32 bit x86 SMP
+Description-md5: ecea5a2a0e2ea502f44ed6d423545e5c
+Bugs: https://bugs.launchpad.net/ubuntu/+filebug
+Origin: Ubuntu
+Supported: 9m
+
+Package: linux-image-3.16.0-28-generic
+Priority: optional
+Section: kernel
+Installed-Size: 33447
+Maintainer: Ubuntu Kernel Team <kernel-team@lists.ubuntu.com>
+Architecture: i386
+Source: linux-lts-utopic
+Version: 3.16.0-28.38~14.04.1
+Provides: fuse-module, ivtv-modules, kvm-api-4, linux-image, linux-image-3.0, redhat-cluster-modules
+Depends: initramfs-tools (>= 0.36ubuntu6), module-init-tools (>= 3.3-pre11-4ubuntu3)
+Pre-Depends: dpkg (>= 1.10.24)
+Recommends: grub-pc | grub-efi-ia32 | grub | lilo (>= 19.1)
+Suggests: fdutils, linux-lts-utopic-to

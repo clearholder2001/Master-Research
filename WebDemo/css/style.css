@@ -1,0 +1,26 @@
+.tabCont
+{
+	font-family: "微軟正黑體","Arial";
+}
+.tdCont 
+{       
+	padding: 0.5em;
+}      
+.thCont 
+{
+	padding: 0.5em;
+	background-color: #1e61AA;
+	color: white;
+}
+.trCont
+{
+	height: 0.5em;
+}
+.tabCont .trCont:nth-child(even)
+{
+	background-color: #eeeeee;
+}
+.tabCont .trCont:nth-child(odd)
+{
+	background-color:#ffffff;
+}

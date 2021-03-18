@@ -1,0 +1,30 @@
+ge: kde-baseapps-dbg
+Priority: extra
+Section: universe/debug
+Installed-Size: 84535
+Maintainer: Kubuntu Developers <kubuntu-devel@lists.ubuntu.com>
+Original-Maintainer: Debian Qt/KDE Maintainers <debian-qt-kde@lists.debian.org>
+Architecture: i386
+Source: kde-baseapps
+Version: 4:4.13.3-0ubuntu0.1
+Replaces: kdebase-dbg (<< 4:4.7.2)
+Depends: kde-runtime-dbg, konsole-dbg, kate-dbg
+Suggests: kde-baseapps (= 4:4.13.3-0ubuntu0.1)
+Breaks: kdebase-dbg (<< 4:4.7.2)
+Filename: pool/universe/k/kde-baseapps/kde-baseapps-dbg_4.13.3-0ubuntu0.1_i386.deb
+Size: 20640564
+MD5sum: f50b7b19b5527798115accfa26faebd3
+SHA1: 0a49a3d9f895b57e4b74b32ffddf921656337d7e
+SHA256: ac91274df56d752e8045e6dafda9eecccace1fa05e2d7483199c331a5216c853
+Description: debugging symbols for the KDE base applications module
+Homepage: http://www.kde.org/
+Description-md5: 402c353c8c2ae1136238306e5d0b33c3
+Bugs: https://bugs.launchpad.net/ubuntu/+filebug
+Origin: Ubuntu
+Supported: 9m
+
+Package: kde-config-cddb
+Priority: optional
+Section: universe/kde
+Installed-Size: 253
+Maintai

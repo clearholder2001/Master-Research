@@ -1,0 +1,26 @@
+tion utilities
+ Interesting for authors or maintainers of other packages or programs
+ which they want to see internationalized.
+Homepage: http://www.gnu.org/software/gettext/
+Original-Maintainer: Santiago Vila <sanvila@debian.org>
+
+Package: libfontconfig1
+Priority: optional
+Section: libs
+Installed-Size: 498
+Maintainer: Ubuntu Developers <ubuntu-devel-discuss@lists.ubuntu.com>
+Architecture: amd64
+Multi-Arch: same
+Source: fontconfig
+Version: 2.11.0-0ubuntu4.2
+Provides: libfontconfig
+Depends: fontconfig-config (= 2.11.0-0ubuntu4.2), libc6 (>= 2.14), libexpat1 (>= 2.0.1), libfreetype6 (>= 2.2.1)
+Pre-Depends: multiarch-support
+Size: 123368
+Description: generic font configuration library - runtime
+ Fontconfig is a font configuration and customization library, which
+ does not depend on the X Window System. It is designed to locate
+ fonts within the system and select them according to requirements
+ specified by applications.
+ .
+ This package contains the runtime library

@@ -1,0 +1,11 @@
+-video-intel
+Depends: libc6 (>= 2.17), libdrm-intel1 (>= 2.4.38), libdrm2 (>= 2.4.25), libpciaccess0 (>= 0.8.0+git20071002), libpixman-1-0 (>= 0.30.0), libudev1 (>= 183), libx11-6, libx11-xcb1, libxcb-dri2-0, libxcb-dri3-0, libxcb-sync1, libxcb-util0 (>= 0.3.8), libxcb1, libxcursor1 (>> 1.1.2), libxdamage1 (>= 1:1.1), libxext6, libxfixes3, libxinerama1, libxrandr2 (>= 2:1.2.99.2), libxrender1, libxshmfence1, libxtst6, libxv1, libxvmc1, xorg-video-abi-19, xserver-xorg-core-lts-wily (>= 2:1.16.99.901)
+Conflicts: xorg-renamed-package-lts-utopic, xorg-renamed-package-lts-vivid, xserver-xorg-video-intel
+Filename: pool/main/x/xserver-xorg-video-intel-lts-wily/xserver-xorg-video-intel-lts-wily_2.99.917+git20150808-0ubuntu4~trusty2_i386.deb
+Size: 682736
+MD5sum: 3684d132e9480476e3733a3996421f88
+SHA1: 7d4849d396de65921c2813e987e1facdc0cae003
+SHA256: c41b7628c54e82e97b28d2db0ac29a16691132fbf5d62ecb6329cf6618db074b
+Description: X.Org X server -- Intel i8xx, i9xx display driver
+Homepage: http://www.x.org/
+Description-md5: 4c1c091bee575987f9997018db5db7

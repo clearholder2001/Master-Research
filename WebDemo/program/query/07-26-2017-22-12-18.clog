@@ -1,0 +1,40 @@
+File: ./upload/tmp.xyz, Configuration: conf.txt
+################################Configure##################################
+initPath: 
+rootPath: 
+targetPath: 
+pathDirRegex: 
+overWrite: False
+fileMaxSize: 0 bytes
+sourceExtenstion: 
+outputExtension: txt00
+saveRangeImage: False
+enableCUDA: False
+ePlatform: 1
+eArchitecture: 276
+CUDAGenerateDebug: False
+CUDADeviceId: 0
+threadMaxNum: 64
+gridSize: 0.25
+annularNum: 30
+laplacianAperture: 3
+gaussianAperture: 7
+eigenFeatureDiameterMultiple: 4
+borderAdditionWidth: 10
+thumbnailImgMaxSize: 100
+structEleSize: 7
+morIterNum: 3
+structEleShape: 0
+dbName: All-971780-0621-f3-b30.db
+WeightOfEdgeFeature: 0.4
+rankingResultNum: 20
+sqlDBHost: localhost
+sqlDBUser: imgcoding
+sqlDBPass: B9147DB746426832
+sqlDBName: imgcoding
+sqlQueryResultTableName: query_result
+sqlQueryTableName: models_971780_0621
+###########################################################################
+Generate range image & feature done. 5189ms
+Load database done. 11783ms
+Query done. 2247ms

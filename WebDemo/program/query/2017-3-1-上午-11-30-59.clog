@@ -1,0 +1,22 @@
+
+SHA256: fbdb3d3e02136fcad681f1a832513682939d0351f1e2e1daa1fc239f20fa2abe
+Description: X.Org X server -- output driver metapackage
+Description-md5: d6c33380f65bba53cd75efae633435bf
+Bugs: https://bugs.launchpad.net/ubuntu/+filebug
+Origin: Ubuntu
+Supported: 5y
+Task: ubuntu-desktop, ubuntu-usb, kubuntu-desktop, kubuntu-active, kubuntu-active-desktop, kubuntu-active, edubuntu-desktop, edubuntu-usb, xubuntu-desktop, mythbuntu-frontend, mythbuntu-desktop, mythbuntu-backend-slave, mythbuntu-backend-master, lubuntu-core, ubuntustudio-desktop, ubuntu-gnome-desktop
+
+Package: xserver-xorg-video-all-lts-quantal
+Priority: extra
+Section: oldlibs
+Installed-Size: 25
+Maintainer: Ubuntu X-SWAT <ubuntu-x@lists.ubuntu.com>
+Architecture: i386
+Source: xorg-lts-transitional
+Version: 3:6
+Depends: xserver-xorg-video-all
+Filename: pool/main/x/xorg-lts-transitional/xserver-xorg-video-all-lts-quantal_6_i386.deb
+Size: 1594
+MD5sum: 130bdf9f9544489e75227d20e98deea7
+SHA1: 4005244755b68a963bf0265095c3ffa6
